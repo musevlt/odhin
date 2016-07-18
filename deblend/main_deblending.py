@@ -5,7 +5,7 @@ Created on Sun Jan 17 16:31:40 2016
 @author: raphael
 """
 
-from mpdaf.obj import Cube,Image
+from mpdaf.obj import Cube,Image,Spectrum
 from mpdaf.sdetect import Catalog
 import scipy.signal as ssl
 try:#only needed for test purposes
@@ -77,12 +77,9 @@ class Deblending():
         self.shapeLR=self.cubeLR[0].shape
         self.residus=np.zeros((self.cubeLR.shape[0],self.cubeLR.shape[1]*self.cubeLR.shape[2]))
         self.cubeRebuilt=np.zeros((self.cubeLR.shape[0],self.cubeLR.shape[1]*self.cubeLR.shape[2]))
-        if cat is not None:
-            self.cat=cat
-            self.listHST_ID,self.listMUSE_ID=self.getMUSE_ID()
         self.simu=simu
         
-    
+            
     def createAbundanceMap(self,thresh=None,segmap=None,background=False):
         
         #labelisation
@@ -117,6 +114,8 @@ class Deblending():
                 self.listAbundanceMapLR.append(self.abundanceDownsampling(abundanceMapHR,self.shapeHR,self.shapeLR))
             else:
                 self.listAbundanceMapLR.append(self.abundanceDownsampling2(abundanceMapHR,self.shapeHR,self.shapeLR))
+                
+            self.listHST_ID = self.getMUSE_ID()
         
         
     def findSources(self,weight=None, regMatrix=None,lmbda=None,r=10):
@@ -276,13 +275,26 @@ class Deblending():
 
     def getMUSE_ID(self):
         listHST_ID = [int(self.src.images['HST_SEGMAP'].data[self.labelHR==k][0]) for k in xrange(1,self.nbSources)]
-        listMUSE_ID = []
-        k=0
-        for Id in listHST_ID:
-            if len(self.cat[self.cat['RAF_ID']==Id])>0:
-                listMUSE_ID.append(self.cat[self.cat['RAF_ID']==Id]['ID'][0])
-            else:
-                listMUSE_ID.append('NE%s'%k)
-                k=k+1
-        return listHST_ID,listMUSE_ID
+        return listHST_ID
+    
+    def getsp(self):
+        cat = {}
+        for k,key in enumerate(self.listHST_ID):
+            cat[key] = Spectrum(data=self.spectraTot[k], wave=self.src.spectra['MUSE_TOT'].wave)
+        cat['bg'] = Spectrum(data=self.spectraTot[k-1], wave=self.src.spectra['MUSE_TOT'].wave)
+        return cat
         
+if __name__ == '__main__':
+    from muse_analysis.udf import UDFSource
+    src = UDFSource.from_file('/Users/rolandbacon/Dropbox/MUSE/GTO/UDF/Sources/udf-10/deblend_test/udf_udf10_00062.fits')
+    fullcat = Catalog.read('/Users/rolandbacon/UDF/Sources/udf-10/0.31/udf10_c031_e021.vot') 
+    beta=2.8
+    a=0.885
+    b=-3.39e-5
+    listPSF = calcFSF(a, b, beta,np.linspace(4800,9300,10))
+    debl = Deblending(src, listPSF=listPSF)
+    debl.createAbundanceMap(segmap=src.images['HST_SEGMAP'].data, background=True)
+    debl.findSources()
+    cat = debl.getsp()
+    print len(cat)    
+    print 'end'
