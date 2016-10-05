@@ -17,24 +17,193 @@ from matplotlib.colors import LogNorm
 plt.rcParams['figure.figsize']=(15,15)
 from mpdaf.obj import Cube,Image
 from mpdaf.sdetect import Source
-from plotly.offline import download_plotlyjs, init_notebook_mode, iplot,iplot_mpl
+from deblend import main_deblending, deblend_utils
+try:
+    from plotly.offline import download_plotlyjs, init_notebook_mode, iplot,iplot_mpl
+    from plotly import *
+    init_notebook_mode()
+    from plotly.graph_objs import *
+    from deblend_utils import *
+except:
+    pass
 
-init_notebook_mode()
 from skimage.measure import regionprops
-from plotly import *
 from mpdaf.sdetect import Catalog
 from astropy.table import Table
-import scipy.signal as ssl
-import os, sys
-sys.path.append('../../lib/deblending/')
-import main_deblending
-import simuDeblending
 import math
 from math import pi
-from plotly.graph_objs import *
+
 
 from scipy.interpolate import interp1d
-from deblend_utils import *
+import scipy.signal as ssl
+import matplotlib.patches as patches
+
+
+def plotMainDeblend(debl,imMUSE,tab=None):
+    
+    ID=debl.src.ID
+    print '-'*40
+    print "\n Objet %s \n"%ID
+    if tab is not None:
+        tab[tab['ID']==ID].pprint(max_width=-1)
+
+    if debl.background==True:
+        listHST_ID= [int(debl.segmap[debl.labelHR==k][0]) for k in xrange(1,debl.nbSources)]
+    else:
+        listHST_ID= [int(debl.segmap[debl.labelHR==k][0]) for k in xrange(1,debl.nbSources+1)]
+    
+    listNeighbors=debl.src.RAF_ID.split(",")
+    listNeighbors=[int(c) for c in listNeighbors]
+    
+    
+    #get central source
+    if debl.segmap[debl.shapeHR[0]/2,debl.shapeHR[0]/2]==0:
+        HST_ID_center=listNeighbors[0]
+    else:
+        HST_ID_center=debl.segmap[debl.shapeHR[0]/2,debl.shapeHR[0]/2]
+    
+    #remove source if not close to central source 
+    otherNeighbors=[]
+    for HST_ID in listHST_ID:     
+        if (np.sum(debl.segmap[30:-30,30:-30]==HST_ID)>0) and HST_ID not in listNeighbors:
+            otherNeighbors.append(HST_ID)
+    
+    fig,ax=plt.subplots(1,3)
+    imMUSE.plot(zscale=True,ax=ax[0])
+    start=imMUSE.wcs.sky2pix(debl.src.images['MASK_OBJ'].wcs.get_start())[0]
+    rect = patches.Rectangle((start[1],start[0]),debl.src.images['MASK_OBJ'].shape[0],\
+                             debl.src.images['MASK_OBJ'].shape[1],linewidth=1,edgecolor='r',facecolor='none')
+    ax[0].add_patch(rect)
+    
+    ax[1].imshow(debl.labelHR)
+    for region in regionprops(debl.labelHR):
+        ax[1].annotate(
+            listHST_ID[region.label-1],
+            xy = (region.centroid[1],region.centroid[0]), xytext = (-20, 20),
+            textcoords = 'offset points', ha = 'right', va = 'bottom',
+            bbox = dict(boxstyle = 'round,pad=0.5', fc = 'yellow', alpha = 0.5),
+            arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
+    
+    debl.src.images['HST_F775W'].plot(zscale=True,ax=ax[2])
+    plt.show()
+    
+#    plt.figure(figsize=(10,5))
+#    plt.subplot(121)
+#    plt.title("Mask obj")
+#    debl.src.images['MASK_OBJ'].plot()
+#    plt.subplot(122)
+#    plt.title("Abundance map")
+#    plt.imshow(debl.listAbundanceMapLRConvol[0][0][listHST_ID.index(HST_ID_center)].reshape(debl.shapeLR))
+#    plt.show()
+    plt.subplot(131)
+    plt.title("White image MUSE")
+    plt.imshow(np.sum(debl.cubeLR,axis=0))
+    plt.colorbar(fraction=0.046)
+    plt.subplot(132)
+    plt.title("White image estimated")
+    plt.imshow(np.sum(debl.cubeRebuilt,axis=0))
+    plt.colorbar(fraction=0.046)
+    plt.subplot(133)
+    plt.title("Residuals")
+    plt.imshow(np.sum(debl.residus,axis=0),vmax=500,vmin=-500)
+    plt.colorbar(fraction=0.046)
+    plt.show()
+    
+    
+    listNB=[im.replace('NB_','') for im in debl.src.images.keys() if "NB" in im]
+    listNB=[im for im in listNB if (im in debl.src.lines['LINE']) or (im=='OII3727')]
+    listNB=listNB[:5]#limit number of NB images
+    listLines=[]
+    for line in listNB:
+        if line=='OII3727':#inconsistency between NB and lines
+            listLines.append(debl.src.lines[debl.src.lines['LINE']=="OII3726"]['LBDA_OBS'][0])
+        else:
+            listLines.append(debl.src.lines[debl.src.lines['LINE']==line]['LBDA_OBS'][0])
+    listNB=[x for (y, x) in sorted(zip(listLines, listNB))]
+    listLines=sorted(listLines)
+    debl.src.lines['LBDA_OBS']
+    
+    l_main=[x for (y, x) in sorted([(row['SNR'],row['LBDA_OBS']) for row in debl.src.lines])][-1]
+
+    fig,ax=plt.subplots(1,3, gridspec_kw = {'width_ratios':[3, 1,1]},figsize=(15,4))
+    debl.src.spectra['MUSE_PSF_SKYSUB'].plot(label='MUSE_PSF_SKYSUB',ax=ax[0])
+    for line in listLines:
+        ax[0].axvline(line,linestyle='--',c='r')
+    
+    debl.src.spectra['MUSE_PSF_SKYSUB'].subspec(l_main-10,l_main+10).plot(ax=ax[1],label='MUSE_PSF_SKYSUB')
+    
+    spectraTot=debl.getsp()
+    for i in listNeighbors:
+        spectraTot[i].plot(ax=ax[0],label=i)
+        ax[0].legend()
+        for line in listLines:
+            ax[0].axvline(line,linestyle='--',c='r')
+        spectraTot[i].subspec(l_main-10,l_main+10).plot(ax=ax[1],label=i)
+    ax[2].imshow(debl.labelHR)
+    for region in regionprops(debl.labelHR):
+        if listHST_ID[region.label-1] in listNeighbors:
+            ax[2].annotate(
+                listHST_ID[region.label-1],
+                xy = (region.centroid[1],region.centroid[0]), xytext = (-20, 20),
+                textcoords = 'offset points', ha = 'right', va = 'bottom',
+                bbox = dict(boxstyle = 'round,pad=0.5', fc = 'yellow', alpha = 0.5),
+                arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
+    plt.show()
+    
+    if len(otherNeighbors)>0:
+        fig,ax=plt.subplots(len(otherNeighbors),3, gridspec_kw = {'width_ratios':[3, 1,1]},figsize=(15,4*len(otherNeighbors)))
+        for _,i in enumerate(otherNeighbors):
+            if len(otherNeighbors)>1:
+                spectraTot[i].plot(ax=ax[_,0],label=i)
+                for line in listLines:
+                    ax[_,0].axvline(line,linestyle='--',c='r')
+                    ax[_,0].legend()
+                spectraTot[i].subspec(l_main-10,l_main+10).plot(ax=ax[_,1],label=i)
+                ax[_,2].imshow(debl.labelHR)
+                for region in regionprops(debl.labelHR):
+                    if listHST_ID[region.label-1]==i:
+                        ax[_,2].annotate(
+                            listHST_ID[region.label-1],
+                            xy = (region.centroid[1],region.centroid[0]), xytext = (-20, 20),
+                            textcoords = 'offset points', ha = 'right', va = 'bottom',
+                            bbox = dict(boxstyle = 'round,pad=0.5', fc = 'yellow', alpha = 0.5),
+                            arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
+            else:
+                spectraTot[i].plot(ax=ax[0],label=i)
+                for line in listLines:
+                    ax[0].axvline(line,linestyle='--',c='r')
+                ax[0].legend()
+                ax[2].imshow(debl.labelHR)
+                for region in regionprops(debl.labelHR):
+                    if listHST_ID[region.label-1]==i:
+                        ax[2].annotate(
+                            listHST_ID[region.label-1],
+                            xy = (region.centroid[1],region.centroid[0]), xytext = (-20, 20),
+                            textcoords = 'offset points', ha = 'right', va = 'bottom',
+                            bbox = dict(boxstyle = 'round,pad=0.5', fc = 'yellow', alpha = 0.5),
+                            arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
+        plt.show()
+            
+    if len(listNB)>0:
+        if len(listNB)<3:
+            plt.figure(figsize=(5,5))
+        else:
+            plt.figure(figsize=(10,5))
+        for i in xrange(len(listNB)):
+            l=debl.wave.pixel(listLines[i],nearest=True)
+            plt.subplot(2,len(listNB),i+1)
+            plt.title('NB_'+listNB[i])
+            debl.src.images['NB_'+listNB[i]].plot(zscale=True)
+            plt.subplot(2,len(listNB),1+i+len(listNB))
+            plt.title('NB_'+listNB[i])
+            plt.imshow(np.sum(debl.cubeRebuilt[l-5:l+5],axis=0)-np.sum(ssl.medfilt(debl.cubeRebuilt[l-100:l+101],kernel_size=(101,1,1))[95:105],axis=0))
+            
+        plt.tight_layout()
+        plt.show()    
+
+
+
+
 
 def convertFilt(filt,cube=None,x=None):
     """

@@ -13,9 +13,9 @@ from downsampling import downsampling
 
 class SimuDeblending:
     
-    def __init__(self,listCenter,listSpectra,listRadius,listIntens,shapeLR=np.array([41,41]),shapeHR=np.array([161,161]),PSFMuse=None,FiltResp=None):
+    def __init__(self,listCenter,listSpectra,listRadius,listIntens,shapeLR=np.array([41,41]),shapeHR=np.array([161,161]),PSFMuse=None,FiltResp=None,listHiddenSources=[]):
         """
-        FSFMuse: at hugh resolution
+        FSFMuse: at high resolution
         """
         self.LBDA=listSpectra[0].shape[0]
         self.shapeHR=shapeHR
@@ -25,6 +25,8 @@ class SimuDeblending:
         self.listCenter=listCenter
         self.listRadius=listRadius        
         self.listSpectra = listSpectra #s*l
+        
+        self.listHiddenSources=listHiddenSources
         self.DicSources=np.zeros((self.LBDA,self.nbS))
         for k,spec in enumerate(listSpectra):
             self.DicSources[:,k]=self.listSpectra[k]
@@ -57,7 +59,10 @@ class SimuDeblending:
         
         self.ImHR=np.zeros(self.shapeHR)
         self.mapAbundances=np.zeros((self.nbS,self.ImHR.size))
+        self.ImHR_hide=np.zeros(self.shapeHR)
+        self.mapAbundances_hide=np.zeros((self.nbS-len(self.listHiddenSources),self.ImHR.size))
         self.label=np.zeros(self.shapeHR)+len(self.listCenter)
+        self.spectraTot=np.zeros((self.nbS,self.LBDA))
         x,y=np.mgrid[0:self.shapeHR[0], 0:self.shapeHR[1]]
         for k,center in enumerate(self.listCenter):
             zHalo = multivariate_normal.pdf(np.swapaxes([x,y],0,2),mean=center, cov=[[self.listRadius[k], 0], [0, self.listRadius[k]]])
@@ -66,8 +71,10 @@ class SimuDeblending:
             self.label[zHalo>0]=k
             self.ImHR=self.ImHR+zHalo
             self.mapAbundances[k]=zHalo.flatten()
-            
-    
+            self.spectraTot[k]=np.sum(self.mapAbundances[k])*self.listSpectra[k]
+            if k not in self.listHiddenSources:
+                self.ImHR_hide=self.ImHR+zHalo
+                self.mapAbundances_hide[k]=zHalo.flatten()
     
     def generateCubeHR(self):
         cubeHR=np.zeros((self.LBDA,self.shapeHR[0],self.shapeHR[1]))
