@@ -1,0 +1,23 @@
+************
+Installation
+************
+
+Requirements
+============
+
+ODHIN has the following strict requirements:
+
+- Python version 2.7 or 3.3+
+- Numpy version 1.8 or above
+- Scipy version 0.14 or above
+- Matplotlib version 1.4 or above
+- Astropy version 1.0 or above
+
+
+Installing with pip
+===================
+
+ODHIN can be installed with pip::
+
+    pip install odhin
+

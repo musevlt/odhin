@@ -1,0 +1,243 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Deblending &#8212; ODHIN 1 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Full Changelog" href="../changelog.html" />
+    <link rel="prev" title="calcFSF" href="deblend.calcFSF.html" /> 
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../changelog.html" title="Full Changelog"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="deblend.calcFSF.html" title="calcFSF"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ODHIN 1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../deblending.html" accesskey="U">Reference/API</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="deblending">
+<h1>Deblending<a class="headerlink" href="#deblending" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="deblend.Deblending">
+<em class="property">class </em><code class="descclassname">deblend.</code><code class="descname">Deblending</code><span class="sig-paren">(</span><em>src, listFiltName=['/home/raphael/Travail/These/LocalDir/Depot/Code/deblend/deblend/HST_ACS_WFC.F606W_81.dat', '/home/raphael/Travail/These/LocalDir/Depot/Code/deblend/deblend/HST_ACS_WFC.F775W_81.dat', '/home/raphael/Travail/These/LocalDir/Depot/Code/deblend/deblend/HST_ACS_WFC.F814W_81.dat', '/home/raphael/Travail/These/LocalDir/Depot/Code/deblend/deblend/HST_ACS_WFC.F850LP_81.dat'], nBands=10</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending" title="Permalink to this definition">¶</a></dt>
+<dd><p>Main class for deblending process</p>
+<dl class="docutils">
+<dt>src</dt>
+ <span class="classifier-delimiter">:</span> <span class="classifier">mpdaf Source</span><dd>The mpdaf Source object to be deblended</dd>
+<dt>listFiltName</dt>
+ <span class="classifier-delimiter">:</span> <span class="classifier">list of filenames</span><dd>list of filenames of HST response filters.</dd>
+<dt>nbands</dt>
+ <span class="classifier-delimiter">:</span> <span class="classifier">int</span><dd>The number of spectral bands to consider for computation
+MUSE FSF is assumed constant within a band.</dd>
+</dl>
+<dl class="docutils">
+<dt>cubeRebuilt</dt>
+ <span class="classifier-delimiter">:</span> <span class="classifier">numpy.ndarray</span><dd>Estimated cube</dd>
+<dt>residus</dt>
+ <span class="classifier-delimiter">:</span> <span class="classifier">numpy.ndarray</span><dd>The cube of residuals (datacube - estimated cube)</dd>
+<dt>spectraTot</dt>
+ <span class="classifier-delimiter">:</span> <span class="classifier">list</span><dd>List of recovered spectra calibrated in flux</dd>
+<dt>sources: list</dt>
+<dd>list of spectra estimated during the process (non calibrated)</dd>
+</dl>
+<p>listAbundanceMap (HR,LR,LRConvol) : list
+list of Abundance Map of each object detected, at each step :</p>
+<blockquote>
+<div>High resolution, after subsampling, and after convolution</div></blockquote>
+<p class="rubric">Methods Summary</p>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><a class="reference internal" href="#deblend.Deblending.combineSpectra" title="deblend.Deblending.combineSpectra"><code class="xref py py-obj docutils literal"><span class="pre">combineSpectra</span></code></a>()</td>
+<td></td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="#deblend.Deblending.corrAlign" title="deblend.Deblending.corrAlign"><code class="xref py py-obj docutils literal"><span class="pre">corrAlign</span></code></a>([PSF_HST])</td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#deblend.Deblending.createAbundanceMap" title="deblend.Deblending.createAbundanceMap"><code class="xref py py-obj docutils literal"><span class="pre">createAbundanceMap</span></code></a>([thresh,&nbsp;segmap,&nbsp;background])</td>
+<td></td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="#deblend.Deblending.findSources" title="deblend.Deblending.findSources"><code class="xref py py-obj docutils literal"><span class="pre">findSources</span></code></a>([U,&nbsp;hstpsf,&nbsp;antialias,&nbsp;nonneg])</td>
+<td>U: spatial support of abundances (for new estimations using OMP)</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#deblend.Deblending.getContinuumCube" title="deblend.Deblending.getContinuumCube"><code class="xref py py-obj docutils literal"><span class="pre">getContinuumCube</span></code></a>([w])</td>
+<td>Build continuum cube by median filtering (much faster here as it is done on objects spectra instead of all pixel spectra)</td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="#deblend.Deblending.getHST_ID" title="deblend.Deblending.getHST_ID"><code class="xref py py-obj docutils literal"><span class="pre">getHST_ID</span></code></a>()</td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#deblend.Deblending.getLabel" title="deblend.Deblending.getLabel"><code class="xref py py-obj docutils literal"><span class="pre">getLabel</span></code></a>([image,&nbsp;thresh,&nbsp;segmap])</td>
+<td></td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="#deblend.Deblending.getResidus" title="deblend.Deblending.getResidus"><code class="xref py py-obj docutils literal"><span class="pre">getResidus</span></code></a>()</td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#deblend.Deblending.getTotSpectra" title="deblend.Deblending.getTotSpectra"><code class="xref py py-obj docutils literal"><span class="pre">getTotSpectra</span></code></a>()</td>
+<td></td>
+</tr>
+<tr class="row-even"><td><a class="reference internal" href="#deblend.Deblending.getsp" title="deblend.Deblending.getsp"><code class="xref py py-obj docutils literal"><span class="pre">getsp</span></code></a>()</td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#deblend.Deblending.rebuildCube" title="deblend.Deblending.rebuildCube"><code class="xref py py-obj docutils literal"><span class="pre">rebuildCube</span></code></a>(sources[,&nbsp;tmp_sources])</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Methods Documentation</p>
+<dl class="method">
+<dt id="deblend.Deblending.combineSpectra">
+<code class="descname">combineSpectra</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending.combineSpectra"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending.combineSpectra" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="deblend.Deblending.corrAlign">
+<code class="descname">corrAlign</code><span class="sig-paren">(</span><em>PSF_HST=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending.corrAlign"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending.corrAlign" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="deblend.Deblending.createAbundanceMap">
+<code class="descname">createAbundanceMap</code><span class="sig-paren">(</span><em>thresh=None</em>, <em>segmap=None</em>, <em>background=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending.createAbundanceMap"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending.createAbundanceMap" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="deblend.Deblending.findSources">
+<code class="descname">findSources</code><span class="sig-paren">(</span><em>U=None</em>, <em>hstpsf=True</em>, <em>antialias=True</em>, <em>nonneg=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending.findSources"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending.findSources" title="Permalink to this definition">¶</a></dt>
+<dd><p>U: spatial support of abundances (for new estimations using OMP)</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="deblend.Deblending.getContinuumCube">
+<code class="descname">getContinuumCube</code><span class="sig-paren">(</span><em>w=101</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending.getContinuumCube"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending.getContinuumCube" title="Permalink to this definition">¶</a></dt>
+<dd><p>Build continuum cube by median filtering (much faster here as it is done on objects spectra instead of all pixel spectra)</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="deblend.Deblending.getHST_ID">
+<code class="descname">getHST_ID</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending.getHST_ID"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending.getHST_ID" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="deblend.Deblending.getLabel">
+<code class="descname">getLabel</code><span class="sig-paren">(</span><em>image=None</em>, <em>thresh=None</em>, <em>segmap=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending.getLabel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending.getLabel" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="deblend.Deblending.getResidus">
+<code class="descname">getResidus</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending.getResidus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending.getResidus" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="deblend.Deblending.getTotSpectra">
+<code class="descname">getTotSpectra</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending.getTotSpectra"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending.getTotSpectra" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="deblend.Deblending.getsp">
+<code class="descname">getsp</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending.getsp"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending.getsp" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="deblend.Deblending.rebuildCube">
+<code class="descname">rebuildCube</code><span class="sig-paren">(</span><em>sources</em>, <em>tmp_sources=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/deblend/main_deblending.html#Deblending.rebuildCube"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#deblend.Deblending.rebuildCube" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="deblend.calcFSF.html"
+                        title="previous chapter">calcFSF</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="../changelog.html"
+                        title="next chapter">Full Changelog</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/api/deblend.Deblending.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../changelog.html" title="Full Changelog"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="deblend.calcFSF.html" title="calcFSF"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ODHIN 1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../deblending.html" >Reference/API</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2017, Raphael Bacher.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.1.
+    </div>
+  </body>
+</html>
