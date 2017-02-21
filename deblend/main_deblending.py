@@ -9,9 +9,12 @@ from mpdaf.obj import Cube,Image,Spectrum
 import scipy.signal as ssl
 
 import numpy as np
-from skimage.measure import label
-from skimage.morphology import closing, square
-from skimage.measure import regionprops
+try:
+    from skimage.measure import label
+    from skimage.morphology import closing, square
+    from skimage.measure import regionprops
+except:
+    pass
 from scipy.interpolate import interp1d
 import scipy.optimize as so
 import os

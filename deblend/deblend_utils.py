@@ -7,22 +7,28 @@ Created on Thu Jun 30 10:53:50 2016
 import numpy as np
 import scipy.signal as ssl
 from numpy import ma
-from scipy.ndimage.morphology import (grey_opening, grey_dilation, binary_erosion)
 from scipy.ndimage.filters import convolve
 import scipy.optimize as so
 from scipy.interpolate import interp1d
 import astropy.units as units
 import math
-from skimage.measure import block_reduce
 from muse_analysis.imphot import fit_image_photometry, rescale_hst_like_muse
+from scipy import ndimage
 
+def block_sum(ar, fact):
+    sx, sy = ar.shape
+    X, Y = np.ogrid[0:sx, 0:sy]
+    regions = sy/fact * (X/fact[0]) + Y/fact[1]
+    res = ndimage.sum(ar, labels=regions, index=np.arange(regions.max() + 1))
+    res.shape = (sx/fact[0], sy/fact[1])
+    return res
 
 def generatePSF_HST(alphaHST, betaHST, shape=(375, 375),shapeMUSE=(25,25)):
     """Generate PSF HST at MUSE resolution"""
     PSF_HST_HR = generateMoffatIm(shape=shape, center=(shape[0]/2, shape[1]/2),
                                       alpha=alphaHST, beta=betaHST, dim=None)
     factor = (shape[0]/shapeMUSE[0], shape[1]/shapeMUSE[1])
-    PSF_HST = block_reduce(PSF_HST_HR, (factor[0], factor[1]))
+    PSF_HST = block_sum(PSF_HST_HR, (factor[0], factor[1]))
     return PSF_HST
 
 
