@@ -18,7 +18,7 @@ from scipy import ndimage
 def block_sum(ar, fact):
     sx, sy = ar.shape
     X, Y = np.ogrid[0:sx, 0:sy]
-    regions = sy/fact * (X/fact[0]) + Y/fact[1]
+    regions = sy/fact[1] * (X/fact[0]) + Y/fact[1]
     res = ndimage.sum(ar, labels=regions, index=np.arange(regions.max() + 1))
     res.shape = (sx/fact[0], sy/fact[1])
     return res
