@@ -4,7 +4,7 @@ setup(
     name='deblend',                                                              
     version='0.1',                                                             
     install_requires=['numpy', 'matplotlib', 'astropy', 
-                       'scipy','adjustText','termcolor'],
+                       'scipy','adjustText','termcolor','scikit-image'],
     packages=find_packages(),                                                  
     zip_safe=False,                                                            
     package_data={                                                             
