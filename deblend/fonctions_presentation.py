@@ -147,20 +147,21 @@ def plotMainDeblend(debl,imMUSE=None,tab=None,saveDir='.',show=True,savePdf=Fals
             plt.clf()
 
         fig=plt.figure(figsize=(10,5))
-        plt.suptitle("Residuals",fontsize=20)
+        plt.suptitle("Residuals", fontsize=20)
         plt.subplot(241)
         plt.title("White image MUSE")
-        im_muse=np.sum(debl.cubeLR,axis=0)
-        factor=np.max(im_muse[5:-5,5:-5])
-        plt.imshow(im_muse[5:-5,5:-5]/factor)
+        im_muse = np.sum(debl.cubeLR, axis=0)
+        # factor=np.max(im_muse[5:-5,5:-5])
+        factor = 1
+        plt.imshow(im_muse[5:-5, 5:-5]/factor)
         plt.colorbar(fraction=0.046)
         plt.subplot(242)
         plt.title("White image estimated")
-        plt.imshow(np.sum(debl.cubeRebuilt,axis=0)[5:-5,5:-5]/factor)
+        plt.imshow(np.sum(debl.cubeRebuilt, axis=0)[5:-5, 5:-5]/factor)
         plt.colorbar(fraction=0.046)
         plt.subplot(243)
         plt.title("Residuals")
-        plt.imshow(np.sum(debl.residus,axis=0)[5:-5,5:-5]/factor)
+        plt.imshow(np.sum(debl.residus, axis=0)[5:-5, 5:-5]/factor,vmax=np.max(np.sum(debl.cubeLR, axis=0)[5:-5, 5:-5]))
         plt.colorbar(fraction=0.046)
 #        if saveDir is not None:
 #            if savePdf==True:

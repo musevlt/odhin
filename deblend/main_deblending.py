@@ -53,6 +53,8 @@ class Deblending():
 
     cubeRebuilt : numpy.ndarray
         Estimated cube
+    cubeRebuiltCont : numpy.ndarray
+        Estimated cube continuum
     residus : numpy.ndarray
         The cube of residuals (datacube - estimated cube)
     spectraTot : list
@@ -81,9 +83,55 @@ class Deblending():
         self.listImagesHR = [src.images['HST_F606W'].copy(),src.images['HST_F775W'].copy(),
                              src.images['HST_F814W'].copy(),src.images['HST_F850LP'].copy()]
         l_min, l_max = src.cubes['MUSE_CUBE'].wave.get_range()
-        self.listFWHM = [src.header['FSF00FWA']+src.header['FSF00FWB']*(l+(l_min-l_max)/nBands)
+
+        if 'FSF00FWA' in src.header.keys():
+            self.fsf_a = src.header['FSF00FWA']
+            self.fsf_b = src.header['FSF00FWB']
+            self.betaFSF = src.header['FSF00BET']
+        elif 'FSF99FWA' in src.header.keys():
+            self.fsf_a = src.header['FSF99FWA']
+            self.fsf_b = src.header['FSF99FWB']
+            self.betaFSF = src.header['FSF99BET']
+        elif 'FSF01FWA' in src.header.keys():
+            self.fsf_a = src.header['FSF01FWA']
+            self.fsf_b = src.header['FSF01FWB']
+            self.betaFSF = src.header['FSF01BET']
+        elif 'FSF02FWA' in src.header.keys():
+            self.fsf_a = src.header['FSF02FWA']
+            self.fsf_b = src.header['FSF02FWB']
+            self.betaFSF = src.header['FSF02BET']
+        elif 'FSF03FWA' in src.header.keys():
+            self.fsf_a = src.header['FSF03FWA']
+            self.fsf_b = src.header['FSF03FWB']
+            self.betaFSF = src.header['FSF03BET']
+        elif 'FSF04FWA' in src.header.keys():
+            self.fsf_a = src.header['FSF04FWA']
+            self.fsf_b = src.header['FSF04FWB']
+            self.betaFSF = src.header['FSF04BET']
+        elif 'FSF05FWA' in src.header.keys():
+            self.fsf_a = src.header['FSF05FWA']
+            self.fsf_b = src.header['FSF05FWB']
+            self.betaFSF = src.header['FSF05BET']
+        elif 'FSF06FWA' in src.header.keys():
+            self.fsf_a = src.header['FSF06FWA']
+            self.fsf_b = src.header['FSF06FWB']
+            self.betaFSF = src.header['FSF06BET']
+        elif 'FSF07FWA' in src.header.keys():
+            self.fsf_a = src.header['FSF07FWA']
+            self.fsf_b = src.header['FSF07FWB']
+            self.betaFSF = src.header['FSF07BET']
+        elif 'FSF08FWA' in src.header.keys():
+            self.fsf_a = src.header['FSF08FWA']
+            self.fsf_b = src.header['FSF08FWB']
+            self.betaFSF = src.header['FSF08BET']
+        elif 'FSF09FWA' in src.header.keys():
+            self.fsf_a = src.header['FSF09FWA']
+            self.fsf_b = src.header['FSF09FWB']
+            self.betaFSF = src.header['FSF09BET']
+
+        self.listFWHM = [self.fsf_a+self.fsf_b*(l+(l_min-l_max)/nBands)
                         for l in np.linspace(l_min, l_max, nBands)]
-        self.betaFSF = src.header['FSF00BET']
+
         self.nBands = nBands
         if listFiltName is not None:
             self.filtResp = [convertFilt(np.loadtxt(filtName), self.wave) for filtName in listFiltName]
@@ -111,7 +159,7 @@ class Deblending():
             self.listImagesLR.append(imMUSE)
 
             #build muse average FSF for the filter spectral band
-            fwhm_muse=self.src.header['FSF00FWA']+self.src.header['FSF00FWB']*[6060, 7750, 8140, 8500][filt]
+            fwhm_muse=self.fsf_a+self.fsf_b*[6060, 7750, 8140, 8500][filt]
             imHST = self.listImagesHR[filt]
             # get spatial shift (dx,dy)
             self.listShift[filt] = getSpatialShift(imMUSE, imHST, self.betaFSF, fwhm_muse, PSF_HST)
@@ -132,7 +180,6 @@ class Deblending():
         self.listHST_ID = self.getHST_ID()
 
         self.listAbundanceMapHR = []
-        self.listAbundanceMapHRConvol = []
 
         # for each HST filter, create the high resolution intensity matrix (nbSources x Nb pixels )
         for j in xrange(len(self.listImagesHR)):
@@ -145,27 +192,28 @@ class Deblending():
                 mask[:] = 0
 
             for k in xrange(1,np.max(self.labelHR)+1):
-                mask[self.labelHR == k] = np.maximum(self.listImagesHR[j].data[self.labelHR==k],0)#avoid negative abundances
-                #mask[self.labelHR==k]=self.listImagesHR[j].data[self.labelHR==k]
-                #mask[self.labelHR==k]=1
+                mask[self.labelHR == k] = np.maximum(self.listImagesHR[j].data[self.labelHR==k],10**(-9))#avoid negative abundances
 
-                mask = mask/np.max(mask)
+
+                #mask = mask/np.max(mask)
                 abundanceMapHR[k-1] = mask.copy().flatten()  # k-1 to manage the background that have label 0 but is pushed to the last position
                 mask[:] = 0
 
             self.listAbundanceMapHR.append(abundanceMapHR)
 
-    def findSources(self, U=None, hstpsf=True, antialias=True, nonneg=True):
+    def findSources(self, U=None, hstpsf=True, antialias=True, nonneg=True,alpha=2):
         """
         U: spatial support of abundances (for new estimations using OMP)
         hstpsf: apply hst psf on MUSE or not
         antialias: apply antialias filter or not
         nonneg: soft penalization for spectra estimation or not
+        alpha: regularization parameter
         """
         self.convolvedCube = np.zeros_like(self.cubeLR)
         self.sources = np.zeros((self.nbSources, self.cubeLR.shape[0]))
         self.varSources = np.zeros((self.nbSources, self.cubeLR.shape[0]))
         self.listAbundanceMapLRConvol = []
+        self.listAbundanceMapLRConvolClean = []
         self.tmp_sources = []
         self.tmp_var = []
 
@@ -176,8 +224,8 @@ class Deblending():
             self.tmp_var.append(np.zeros_like(self.sources))
 
             self.listAbundanceMapLRConvol.append([])
-            if antialias is False:
-                self.listAbundanceMapHRConvol.append([])
+            self.listAbundanceMapLRConvolClean.append([])
+
 
             delta = int(self.cubeLR.shape[0]/float(self.nBands))
             for i in xrange(self.nBands):
@@ -185,6 +233,10 @@ class Deblending():
                     self.src.cubes['MUSE_CUBE'][0,:,:], self.listImagesHR[j],self.listFWHM[i],
                     self.betaFSF, self.listShift[j], antialias=antialias)
                 # abundanceMapLRConvol[abundanceMapLRConvol<0]=10**(-5) #Trunc negative abundances (from noisy negative HST pixels)
+
+                ## TEST TO REMOVE CONVOLUTION WINGS
+                U=getMainSupport(abundanceMapLRConvol[:-1], alpha=0.99)
+                abundanceMapLRConvol[:-1][~U]=0
 
                 if self.background is True:
                     abundanceMapLRConvol[-1] = 1.
@@ -212,7 +264,7 @@ class Deblending():
 
                 inv=np.linalg.pinv(A)
                 if nonneg:
-                    self.tmp_sources[j][:, i*delta:(i+1)*delta] = ADMM_soft_neg(A, B, lmbda=2.)
+                    self.tmp_sources[j][:, i*delta:(i+1)*delta] = ADMM_soft_neg(A, B, alpha=alpha)
                     #self.tmp_sources[j][:, i*delta:(i+1)*delta] = ADMM_soft_neg(A, B, lmbda=[50./np.mean(var,axis=0)])
                 else:
                     self.tmp_sources[j][:, i*delta:(i+1)*delta] = np.linalg.lstsq(A, B)[0]
@@ -221,20 +273,24 @@ class Deblending():
 
                 # Estimation of abundances:
                 # we have to recompute the abundance map by inversing again the system
+                # save old abundanceMap
+                self.listAbundanceMapLRConvolClean[j].append(abundanceMapLRConvol.copy())
                 B = self.cubeLR[i*delta:(i+1)*delta].reshape(
                         self.cubeLR[i*delta:(i+1)*delta].shape[0],
                         self.cubeLR.shape[1]*self.cubeLR.shape[2])
                 A = self.tmp_sources[j][:, i*delta:(i+1)*delta].T
 
                 if self.background:
-                    U = np.array([(row/np.max(row)) > 0.0001 for row in abundanceMapLRConvol[:-1]])
+                    #U = np.array([(row/np.max(row)) > 0.0001 for row in abundanceMapLRConvol[:-1]])
                     #U = getMainSupport(abundanceMapLRConvol[:-1], alpha=0.99)
+                    #U=np.ones_like(U).astype(int)
                     for it in xrange(abundanceMapLRConvol.shape[1]):
                         if np.sum(U[:, it]) > 0:
                             abundanceMapLRConvol[:-1, it][U[:, it]] = \
                                 so.nnls(A[:,:-1][:,U[:, it]],B[:, it]-A[:,-1]*abundanceMapLRConvol[-1,it])[0]
                 else:
-                    U=np.array([(row/np.max(row)) > 0.01 for row in abundanceMapLRConvol[:-1]])
+                    #U=np.array([(row/np.max(row)) > 0.01 for row in abundanceMapLRConvol[:-1]])
+                    U=getMainSupport(abundanceMapLRConvol, alpha=0.99)
                     for it in xrange(abundanceMapLRConvol.shape[1]):
                         abundanceMapLRConvol[:, it] = so.nnls(A, B[:, it])[0]
 

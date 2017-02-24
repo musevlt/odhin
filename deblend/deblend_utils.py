@@ -15,6 +15,7 @@ import math
 from muse_analysis.imphot import fit_image_photometry, rescale_hst_like_muse
 from scipy import ndimage
 
+
 def block_sum(ar, fact):
     sx, sy = ar.shape
     X, Y = np.ogrid[0:sx, 0:sy]
@@ -23,7 +24,8 @@ def block_sum(ar, fact):
     res.shape = (sx/fact[0], sy/fact[1])
     return res
 
-def generatePSF_HST(alphaHST, betaHST, shape=(375, 375),shapeMUSE=(25,25)):
+
+def generatePSF_HST(alphaHST, betaHST, shape=(375, 375), shapeMUSE=(25, 25)):
     """Generate PSF HST at MUSE resolution"""
     PSF_HST_HR = generateMoffatIm(shape=shape, center=(shape[0]/2, shape[1]/2),
                                       alpha=alphaHST, beta=betaHST, dim=None)
@@ -46,8 +48,8 @@ def apply_resampling_window(im):
     # Create an array which, for each pixel in the FFT image, holds
     # the radial spatial-frequency of the pixel center, divided by the
     # Nyquist folding frequency (ie. 0.5 cycles/image_pixel).
-    shape=im.shape
-    imfft=np.fft.rfft2(im)
+    shape = im.shape
+    imfft = np.fft.rfft2(im)
     f = np.sqrt((np.fft.rfftfreq(shape[1]) / 0.5)**2 +
                 (np.fft.fftfreq(shape[0]) / 0.5)[np.newaxis,:].T**2)
 
@@ -71,19 +73,20 @@ def convertFilt(filt,wave=None,x=None):
     return np.array(f(x))
 
 
-def calcFSF(a,b,beta,listLambda,center=(12,12),shape=(25,25),dim='MUSE'):
+def calcFSF(a, b, beta, listLambda, center=(12, 12), shape=(25, 25), dim='MUSE'):
     """
     Build list of FSF images (np arrays) from parameters a,b and beta. fwhm=a+b*lmbda, and beta is the Moffat parameter.
     """
-    listFSF=[]
+    listFSF = []
     for lmbda in listLambda:
-        fwhm=a+b*lmbda
+        fwhm = a+b*lmbda
 
-        alpha=np.sqrt(fwhm**2/(4*(2**(1/beta)-1)))
-        listFSF.append(generateMoffatIm(center,shape,alpha,beta,dim=dim))
+        alpha = np.sqrt(fwhm**2/(4*(2**(1/beta)-1)))
+        listFSF.append(generateMoffatIm(center, shape, alpha, beta, dim=dim))
     return listFSF
 
-def Moffat(r,alpha,beta):
+
+def Moffat(r, alpha, beta):
     return (beta-1)/(math.pi*alpha**2)*(1+(r/alpha)**2)**(-beta)
 
 def generateMoffatIm(center=(12,12),shape=(25,25),alpha=2,beta=2.5,a=0.,b=0.,dim='MUSE'):
@@ -91,23 +94,25 @@ def generateMoffatIm(center=(12,12),shape=(25,25),alpha=2,beta=2.5,a=0.,b=0.,dim
     by default alpha is supposed to be given in arsec, if not it is given in MUSE pixel.
     a,b allow to decenter slightly the Moffat image.
     """
-    ind=np.indices(shape)
-    r=np.sqrt(((ind[0]-center[0]+a)**2 + ((ind[1]-center[1]+b))**2))
-    if dim=='MUSE':
-        r=r*0.2
-    elif dim=='HST':
-        r=r*0.03
-    res=Moffat(r,alpha,beta)
-    res=res/np.sum(res)
+    ind = np.indices(shape)
+    r = np.sqrt(((ind[0]-center[0]+a)**2 + ((ind[1]-center[1]+b))**2))
+    if dim == 'MUSE':
+        r = r*0.2
+    elif dim == 'HST':
+        r = r*0.03
+    res = Moffat(r, alpha, beta)
+    res = res/np.sum(res)
     return res
 
-def normalize(a, axis=-1, order=2,returnCoeff=False):
+
+def normalize(a, axis=-1, order=2, returnCoeff=False):
     l2 = np.atleast_1d(np.linalg.norm(a, order, axis))
-    l2[l2==0] = 1
-    if returnCoeff==True:
-        return a / np.expand_dims(l2, axis),np.expand_dims(l2, axis)
+    l2[l2 == 0] = 1
+    if returnCoeff is True:
+        return a / np.expand_dims(l2, axis), np.expand_dims(l2, axis)
     else:
         return a / np.expand_dims(l2, axis)
+
 
 def getSpatialShift(imMUSE_0, imHST_0, beta_muse, fwhm_muse, PSF_HST):
     imHST_1 = imHST_0.copy()
@@ -116,51 +121,55 @@ def getSpatialShift(imMUSE_0, imHST_0, beta_muse, fwhm_muse, PSF_HST):
     res = fit_image_photometry(imHST_1, imMUSE_0, fix_beta=beta_muse,
                                fix_fwhm=fwhm_muse, fix_dx=None, fix_dy=None, display=False)[0]
 
-    return (res.dx.value,res.dy.value)
+    return (res.dx.value, res.dy.value)
 
-def approxNNLS(A,b,lmbda):
+
+def approxNNLS(A, b, lmbda):
     """Solve ||Ax-b|| w.r.t. x>0"""
-    inv=np.linalg.pinv(A)
-    x1=np.dot(inv,b)
-    if len(x1.shape)==1:
-        x1=x1[:,np.newaxis]
-    x2=np.zeros_like(x1)
-    mask=(x1<0).astype(int)
+    inv = np.linalg.pinv(A)
+    x1 = np.dot(inv, b)
+    if len(x1.shape) == 1:
+        x1 = x1[:, np.newaxis]
+    x2 = np.zeros_like(x1)
+    mask = (x1 < 0).astype(int)
     for l in xrange(x1.shape[1]):
         H=np.diag(mask[:,l])
         x2[:,l]=np.linalg.lstsq(np.vstack([A,lmbda*H]),np.concatenate([b[:,l],np.zeros_like(x1[:,l])]))[0]
     return x2
 
-def ADMM_soft_neg(A,b,x0=None,nIter=20,lmbda=10,rho=1.):
+
+def ADMM_soft_neg(A, b, x0=None, nIter=20, alpha=10, rho=1.):
     """
     Solve ||Ax-b|| w.r.t. x>0
     """
     if x0 is None:
-        x0=np.random.rand(A.shape[1],b.shape[1])
-    x=x0
-    h=np.random.rand(x.shape[0],x.shape[1])
-    z=np.random.rand(x.shape[0],x.shape[1])
-    aTa=np.dot(A.T,A)+rho*lmbda*np.eye(A.shape[1])
-    aTb=np.dot(A.T,b)
+        x0 = np.random.rand(A.shape[1], b.shape[1])
+    x = x0
+    h = np.random.rand(x.shape[0], x.shape[1])
+    z = np.random.rand(x.shape[0], x.shape[1])
+    aTa = np.dot(A.T, A)+rho*alpha*np.eye(A.shape[1])
+    aTb = np.dot(A.T, b)
     for k in xrange(nIter):
         #x=np.dot(np.linalg.inv(np.dot(a.T,a)+rho*np.eye(a.shape[1])),np.dot(a.T,y)+rho*(z-h))
-        x=np.linalg.solve(aTa,aTb+rho*lmbda*(z-h))
-        z=l2_(x,lmbda/rho)
-        h=h+(x-z)
+        x = np.linalg.solve(aTa, aTb+rho*alpha*(z-h))
+        z = l2_(x, alpha/rho)
+        h = h+(x-z)
     return x
 
-def l2_(x,beta):
-    x[x<0]=x[x<0]/(beta+1)
+
+def l2_(x, beta):
+    x[x < 0] = x[x < 0]/(beta+1)
     return x
 
-def soft_(x,beta):
+
+def soft_(x, beta):
     """
     Soft non negative thresholding
     """
-    return np.maximum(np.abs(x+beta/2.)-beta/2.,0)*np.sign(x)
+    return np.maximum(np.abs(x+beta/2.)-beta/2., 0)*np.sign(x)
 
 
-def regrid_hst_like_muse(hst, muse, inplace=True,antialias=True):
+def regrid_hst_like_muse(hst, muse, inplace=True, antialias=True):
     """Resample an HST image onto the spatial coordinate grid of a given
     MUSE image or MUSE cube.
 
@@ -217,8 +226,8 @@ def getHSTIm(hst,muse,fwhm=0.67, beta=2.8,ddx=0.0,ddy=0.0,scale=1,bg=0,
 
     # Convert the initial offsets to pixels, and round them to the nearest
     # integer number of pixels.
-    init_dx=0.
-    init_dy=0.
+    init_dx = 0.
+    init_dy = 0.
     pxoff = int(np.floor(init_dx / dx + 0.5))
     pyoff = int(np.floor(init_dy / dy + 0.5))
 
@@ -226,8 +235,8 @@ def getHSTIm(hst,muse,fwhm=0.67, beta=2.8,ddx=0.0,ddy=0.0,scale=1,bg=0,
 
     xshift = pxoff * dx
     yshift = pyoff * dy
-    subtracted=np.ma.median(muse.data)
-    mask=hst_mask
+    subtracted = np.ma.median(muse.data)
+    mask = hst_mask
 
     # Copy both image arrays into masked array containers that use the
     # above mask.
@@ -525,13 +534,14 @@ def _bevel_mask(mask, width):
 
     return convolve(im, m)
 
-def getMainSupport(u,alpha=0.999):
+
+def getMainSupport(u, alpha=0.999):
     """
     Get mask containing fraction alpha of total map intensity.
     """
-    mask=np.zeros_like(u).astype(int)
+    mask = np.zeros_like(u).astype(bool)
     for i,row in enumerate(u):
         s=np.cumsum(np.sort(row)[::-1])
         keepNumber=np.sum(s<alpha*s[-1])
-        mask[i,np.argsort(row,axis=None)[-keepNumber:]]=1
+        mask[i,np.argsort(row,axis=None)[-keepNumber:]]=True
     return mask
