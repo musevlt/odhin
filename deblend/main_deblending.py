@@ -135,10 +135,10 @@ class Deblending():
         self.nBands = nBands
         if listFiltName is not None:
             self.filtResp = [convertFilt(np.loadtxt(filtName), self.wave) for filtName in listFiltName]
-            for k, im in enumerate(self.listImagesHR):
-                im.primary_header['FILTER'] = ['f606w', 'f775w', 'f814w', 'f850lp'][k]
         else:
-            self.filtResp = None
+            self.filtResp = [np.ones(self.cubeLR.shape[0])]*4
+        for k, im in enumerate(self.listImagesHR):
+            im.primary_header['FILTER'] = ['f606w', 'f775w', 'f814w', 'f850lp'][k]
         self.shapeHR = self.listImagesHR[0].shape
         self.shapeLR = self.cubeLR[0].shape
         self.residus = np.zeros((self.cubeLR.shape[0], self.cubeLR.shape[1]*self.cubeLR.shape[2]))
@@ -235,7 +235,7 @@ class Deblending():
                 # abundanceMapLRConvol[abundanceMapLRConvol<0]=10**(-5) #Trunc negative abundances (from noisy negative HST pixels)
 
                 ## TEST TO REMOVE CONVOLUTION WINGS
-                U=getMainSupport(abundanceMapLRConvol[:-1], alpha=0.99)
+                U=getMainSupport(abundanceMapLRConvol[:-1], alpha=0.999)
                 abundanceMapLRConvol[:-1][~U]=0
 
                 if self.background is True:
@@ -252,6 +252,8 @@ class Deblending():
                 if antialias:
                     if hstpsf:
                         B=np.hstack([apply_resampling_window(ssl.fftconvolve(B[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same')).flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
+                        #B=np.hstack([apply_resampling_window(ssl.convolve2d(B[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same',boundary='symm')).flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
+                        var=np.hstack([ssl.fftconvolve(var[:,l].reshape(self.shapeLR),self.PSF_HST**2,mode='same').flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
                     else:
                         B=np.hstack([apply_resampling_window(B[:,l].reshape(self.shapeLR)).flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
                 else:
@@ -324,10 +326,10 @@ class Deblending():
                 for k in xrange(self.nbSources):
                     tmp[j][k, int(i*delta):int((i+1)*delta)] = \
                        np.sum(np.outer(self.tmp_sources[j][k, int(i*delta):int((i+1)*delta)],
-                                       self.listAbundanceMapLRConvol[j][i][k]),axis=1)
+                                       self.listAbundanceMapLRConvolClean[j][i][k]),axis=1)
                     tmpVar[j][k,int(i*delta):int((i+1)*delta)] = \
                           self.tmp_var[j][k,int(i*delta):int((i+1)*delta)]* \
-                            np.sum(self.listAbundanceMapLRConvol[j][i][k])**2
+                            np.sum(self.listAbundanceMapLRConvolClean[j][i][k])**2
         self.spectraTot = np.sum([self.filtResp[l]*tmp[l] for l in xrange(len(self.filtResp))], axis=0)/ \
                                 np.sum([self.filtResp[l] for l in xrange(len(self.filtResp))],axis=0)
 

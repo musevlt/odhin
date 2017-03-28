@@ -9,6 +9,7 @@ import numpy as np
 import scipy.signal as ssl
 from scipy.stats import multivariate_normal
 from downsampling import downsampling
+from deblend_utils import generateMoffatIm
 
 
 class SimuDeblending:
@@ -38,7 +39,7 @@ class SimuDeblending:
             # self.PSFMuse=generateGaussianIm(self.shapeHR/2,self.shapeHR,sig=4.)
             # self.PSFMuse=generateGaussianIm(self.shapeLR/2,self.shapeLR,sig=5.)
             # self.PSFMuse=generateMoffatIm(self.shapeHR/2,self.shapeHR,3*self.d[0],2.7)
-            self.PSFMuse = generateMoffatIm((15, 15), (31, 31), 3, 2.7)
+            self.PSFMuse = generateMoffatIm(shape=(15, 15), center=(7, 7), alpha=3, beta=2.8,dim=None)
         else:
             self.PSFMuse = PSFMuse  # f*f
         #self.generatePSFMatrixHR()
@@ -55,6 +56,7 @@ class SimuDeblending:
             self.CubeLR[k],self.downsamplingMatrix,self.Mh, self.Mv = \
                        downsampling(self.CubeHR[k], self.shapeLR, returnMatrix=True)#downsampling
         self.CubeLR = ssl.fftconvolve(self.CubeLR, self.PSFMuse[np.newaxis,:,:], mode='same') #l*n1*n2
+
 
 
     def generateImHR(self):
@@ -114,16 +116,17 @@ class SimuDeblending:
                              int(max(0, shapeFSF[1]/2-j)):int(min(shapeFSF[1], self.shapeHR[1]+shapeFSF[1]*1/2.-j))]
         self.matrixPSF = self.matrixPSF.reshape((self.shapeHR[0]*self.shapeHR[1], self.shapeHR[0]*self.shapeHR[1]))
 
+    def generateSrc(self, src):
+        self.src=src
+        self.src.cubes['MUSE_CUBE'].data = self.CubeLR
+        self.src.images['HST_F606W'].data = self.ImHR
+        self.src.images['HST_F775W'].data = self.ImHR
+        self.src.images['HST_F814W'].data = self.ImHR
+        self.src.images['HST_F850LP'].data = self.ImHR
+        self.src.header['FSF00FWA'] = 3*2*np.sqrt(2**(1/2.8)-1)
+        self.src.header['FSF00FWB'] = 0
+        self.src.header['FSF00BET'] = 2.8
 
-def Moffat(r, alpha, beta):
-    return (1+(r/alpha)**2)**(-beta)
-
-
-def generateMoffatIm(center=(12, 12), shape=(25, 25), alpha=2, beta=2.5, a=0., b=0.):
-    ind = np.indices(shape)
-    res = Moffat(np.sqrt(((ind[0] - center[0]+a)**2 + ((ind[1] - center[1]+b))**2)), alpha, beta)
-    res = res/np.sum(res)
-    return res
 
 
 def generateGaussianIm(center=(12,12), shape=(25,25), sig=3.):

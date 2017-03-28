@@ -354,3 +354,84 @@ def convertFilt(filt,cube=None,x=None):
     f=interp1d(filt[:,0],filt[:,1],fill_value=0,bounds_error=False)
     return np.array(f(x))
 
+from skimage.measure import regionprops
+def plotCompare(debl,listSrc,listID_m=None,listID_h=None,cat=None):
+    if listID_m is None:
+        listID_m,listID_h=getNeighborsID(debl,cat,withz=True)
+    fig,ax=plt.subplots(1,4,figsize=(20,10))
+    debl.src.images['HST_F775W'].plot(ax=ax[0])
+    ax[0].contour(debl.labelHR,np.arange(np.max(debl.labelHR)+1), colors='black', linewidths=1)
+    debl.src.images['HST_SEGMAP'].plot(ax=ax[1])
+    ax[1].contour(debl.labelHR,np.arange(np.max(debl.labelHR)+1), colors='black', linewidths=1)
+    for region in regionprops(debl.labelHR):
+        try:
+            ax[1].annotate(
+                cat[cat['RAF_ID']==str(debl.listHST_ID[region.label-1])]['ID'][0],
+                xy = (region.centroid[1],region.centroid[0]), xytext = (-20, 20),
+                textcoords = 'offset points', ha = 'right', va = 'bottom',
+                bbox = dict(boxstyle = 'round,pad=0.5', fc = 'yellow', alpha = 0.5),
+                arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
+        except:
+            pass
+    debl.src.images['MUSE_WHITE'].plot(ax=ax[2])
+    buildOverlapMap(debl).plot(ax=ax[3])
+    plt.show()
+
+    listLines=[]
+    fig,ax=plt.subplots(len(listID_m)+1,2,figsize=(20,5*(len(listID_m)+1)),sharey='row')
+
+    debl.src.spectra[debl.src.REFSPEC].plot(ax=ax[0,0])
+    debl.getsp()[int(debl.src.RAF_ID)].plot(ax=ax[0,1])
+    for k,line in enumerate(debl.src.lines['LBDA_OBS']):
+        ax[0,0].axvline(line,color='r',linestyle='--')
+        ax[0,0].set_title('Object %s blended spectrum %s'%(debl.src.ID,debl.src.REFSPEC))
+        ax[0,1].axvline(line,color='r',linestyle='--')
+        ax[0,1].set_title('Object %s deblended spectrum'%debl.src.ID)
+        listLines.append([line,'true'])
+
+    for i in xrange(len(listID_m)):
+        try:
+            src=Source.from_file(DIR_SRC+'udf_mosaic_%s.fits'%str(listID_m[i]).zfill(5))
+
+            for line in src.lines['LBDA_OBS']:
+                ax[i+1,0].axvline(line,color='r',linestyle='--')
+                ax[i+1,1].axvline(line,color='r',linestyle='--')
+                listLines.append([line,"contaminated"])
+            src.spectra[src.REFSPEC].plot(ax=ax[i+1,0])
+            ax[i+1,0].set_title('Object %s blended spectrum %s'%(src.ID,src.REFSPEC))
+            debl.getsp()[listID_h[i]].plot(ax=ax[i+1,1])
+            ax[i+1,1].set_title('Object %s deblended spectrum'%listID_m[i])
+        except:
+            pass
+        #debl.getsp()[int(cat[cat['ID']==listID_m[i]]['RAF_ID'][0])].plot(ax=ax[i+1,1])
+    plt.tight_layout()
+    plt.show()
+
+    fig2,ax2=plt.subplots(len(listLines)/5+1,5,figsize=(5*5,5*(len(listLines)/5+1)))
+    for k,line in enumerate(listLines):
+        pix_line=debl.src.spectra[debl.src.REFSPEC].wave.pixel(line[0],nearest=True)
+        debl.src.spectra[debl.src.REFSPEC][pix_line-30:pix_line+30].plot(ax=ax2[k/5,k%5],label='Blended %s'%debl.src.REFSPEC)
+        ax2[k/5,k%5].set_title('Zoom on %s line %s'%(line[1],line[0]))
+        debl.getsp()[int(debl.src.RAF_ID)][pix_line-30:pix_line+30].plot(ax=ax2[k/5,k%5],label='Deblended object %s'%debl.src.ID)
+    plt.tight_layout()
+    plt.show()
+
+def getNeighborsID(debl,cat,withz=True):
+    listID_h=[]
+    listID_m=[]
+    n=debl.listHST_ID.index(int(debl.src.RAF_ID))
+    for ID_h in debl.src.tables['HST_CAT']['ID']:
+        if (len(cat[cat['RAF_ID']==str(ID_h)]) > 0) and (int(ID_h) in debl.listHST_ID) and (int(ID_h)!=int(debl.src.RAF_ID)):
+            m=debl.listHST_ID.index(int(ID_h))
+            if np.sum((debl.listAbundanceMapLRConvolClean[0][0][n]>0.001*np.sum(debl.listAbundanceMapLRConvolClean[0][0][n])) * (debl.listAbundanceMapLRConvolClean[0][0][m]>0.001*np.sum(debl.listAbundanceMapLRConvolClean[0][0][m])))>5:
+                listID_h.append(ID_h)
+                listID_m.append(cat[cat['RAF_ID']==str(ID_h)]['ID'][0])
+    return listID_m,listID_h
+
+def buildOverlapMap(debl):
+    overlapMap=debl.src.images['MASK_OBJ'].copy()
+    overlapMap.data=overlapMap.data.astype(int)
+    overlapMap.data[:]=0
+    for i in xrange(len(debl.listAbundanceMapLRConvolClean[0][0][:-1])):
+        overlapMap.data[debl.listAbundanceMapLRConvolClean[0][0][i].reshape(debl.shapeLR)>0.001*np.sum(debl.listAbundanceMapLRConvolClean[0][0][i])]=i+1
+    return overlapMap

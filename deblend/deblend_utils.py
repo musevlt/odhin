@@ -31,6 +31,8 @@ def generatePSF_HST(alphaHST, betaHST, shape=(375, 375), shapeMUSE=(25, 25)):
                                       alpha=alphaHST, beta=betaHST, dim=None)
     factor = (shape[0]/shapeMUSE[0], shape[1]/shapeMUSE[1])
     PSF_HST = block_sum(PSF_HST_HR, (factor[0], factor[1]))
+    PSF_HST[PSF_HST < 0.001] = 0
+    PSF_HST = PSF_HST/np.sum(PSF_HST)
     return PSF_HST
 
 
@@ -157,9 +159,19 @@ def ADMM_soft_neg(A, b, x0=None, nIter=20, alpha=10, rho=1.):
     return x
 
 
+def l1_(x, beta):
+    #x[x < 0] = x[x < 0]/(beta+1)
+    #return x
+    z = x.copy()
+    z[x < 0] = x[x < 0]/(beta+1)
+    return z
+
+
 def l2_(x, beta):
-    x[x < 0] = x[x < 0]/(beta+1)
-    return x
+    z = x.copy()
+    #z[x < 0] = 0
+    z[x < -beta] = (1-beta/np.abs(x[x < -beta]))*x[x < -beta]
+    return z
 
 
 def soft_(x, beta):
