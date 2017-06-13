@@ -309,7 +309,6 @@ def glasso_cv(X,Y,ng=9,cv=10,n_alphas=100,eps=1e-3,recompute=True,oneSig=True,
                 if intercept:
                     intercepts[:,mask]=LAMTCV_slid.intercept_.T
                 alphas_.append(LAMTCV_slid.alpha_)
-        #LACV_slid=sklm.LassoCV(alphas=alphas,cv=kf,fit_intercept=intercept)
         if maskOnly==False:
             if listMask==[]:
                 listMask=[[False for l in xrange(coeff.shape[1])]]
@@ -317,7 +316,7 @@ def glasso_cv(X,Y,ng=9,cv=10,n_alphas=100,eps=1e-3,recompute=True,oneSig=True,
                 LAMTCV_slid.fit(X,Y[:,np.maximum(l-ng,0):l+ng+1])
                 if oneSig == True:
                     alpha=oneSigRule(LAMTCV_slid)
-                    #LA_slid=sklm.Lasso(alpha=alpha,fit_intercept=intercept)
+
                     LAMT_slid=sklm.MultiTaskLasso(alpha=alpha,fit_intercept=intercept)
                     LAMT_slid.fit(X,Y[:,np.maximum(l-ng,0):l+ng+1])
                     coeff[:,l]=LAMT_slid.coef_.T[:,np.minimum(ng,l)]
@@ -362,12 +361,10 @@ def glasso_cv(X,Y,ng=9,cv=10,n_alphas=100,eps=1e-3,recompute=True,oneSig=True,
 def glasso(X,Y,ng=9,alpha=0.0001):
 
     coeff=np.zeros((X.shape[1],Y.shape[1]))
-    #LAMTCV_l_slid_alphas=[]
     LAMT_slid=sklm.MultiTaskLasso(alpha=alpha)
     for k in xrange(int(np.ceil(Y.shape[1]/float(ng)))):
         LAMT_slid.fit(X,Y[:,k*ng:(k+1)*ng])
         coeff[:,k*ng:(k+1)*ng]=LAMT_slid.coef_.T
-        #LAMTCV_l_slid_alphas.append(LAMTCV_l_slid.alpha_)
     return coeff
 
 def gridge_bic(X,Y,alphas=np.logspace(-7,3,100),intercept=True,multivar=False,
@@ -416,7 +413,6 @@ def gridge_bic(X,Y,alphas=np.logspace(-7,3,100),intercept=True,multivar=False,
 
     return alphas[n_best]
 
-#@numba.jit
 def gridge_cv(X,Y,ng=1,alphas=np.logspace(-5,2,100),block=True,intercept=True,
               oneSig=False,method='gcv_spe',sig2=None,support=None):
 
@@ -575,7 +571,6 @@ def gridge_kgcv(X,Y,shape,support,alphas=np.logspace(-7,3,100),
 
 
 
-#@numba.jit(nopython=True,nogil=True)
 def gridge_gcv_spectral(X,Y,support,alphas=np.logspace(-7,3,100),
                 w=0,n=10,Sig2=None):
 
@@ -767,8 +762,6 @@ def regulDeblendFunc(X,Y,mask=True,split=True,two_steps=False,l_method='glasso_b
         intercepts=RCV.intercept_.T
     elif g_method =='gridge_cv':
         res,intercepts =gridge_cv(X,Y,ng=ng,intercept=intercept)
-    #if corrflux==True:
-        #res=corrFlux(X,Y,res,np.sum(listMask,axis=0).astype(bool))
     if mask==True:
         if c_method == 'RCV':
             return res,intercepts,listMask,c_coeff,l_coeff,path
@@ -777,6 +770,9 @@ def regulDeblendFunc(X,Y,mask=True,split=True,two_steps=False,l_method='glasso_b
     return res,intercepts
 
 def corrFlux(X,Y,beta,mask=None):
+    """
+    Correct coefficients
+    """
     if (type(mask)==np.bool_) or (mask is None):
         mask=np.zeros(Y.shape[1]).astype(bool)
 
@@ -785,8 +781,5 @@ def corrFlux(X,Y,beta,mask=None):
     Y_t=np.dot(Y[:,~mask],np.linalg.pinv(beta_m))
     for i in xrange(X.shape[1]):
         a=np.dot(Y_t[:,i],X[:,i])/np.linalg.norm(X[:,i])**2
-        #if a <1:
-        #    print "Error: coeff flux <1 : %s %i"%(a,i)
-        #else:
         beta_c[i,~mask]=beta_c[i,~mask]*a
     return beta_c
