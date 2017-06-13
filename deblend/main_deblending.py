@@ -319,7 +319,7 @@ class Deblending():
                 self.listSig2[j].append([])
 
 
-                #Create intensity maps
+                #Create intensity maps at MUSE resolution
                 intensityMapLRConvol = convertIntensityMap(self.listIntensityMapHR[j],
                     self.src.cubes['MUSE_CUBE'][0,:,:], self.listImagesHR[j],self.listFWHM[i],
                     self.betaFSF, self.listShift[j], antialias=antialias,psf_hst=None)
@@ -328,11 +328,11 @@ class Deblending():
                 U = getMainSupport(intensityMapLRConvol[:-1], alpha=0.999)
                 intensityMapLRConvol[:-1][~U] = 0
 
-                if self.background is True:
+                if self.background is True: #put ones everywhere for background intensity map
                     intensityMapLRConvol[-1] = 1.
 
                 A = intensityMapLRConvol.T
-                B = self.cubeLR[i*delta:(i+1)*delta].reshape(
+                Y = self.cubeLR[i*delta:(i+1)*delta].reshape(
                         self.cubeLR[i*delta:(i+1)*delta].shape[0],
                         self.cubeLR.shape[1]*self.cubeLR.shape[2]).T
                 var = self.cubeLRVar[i*delta:(i+1)*delta].reshape(
@@ -341,13 +341,13 @@ class Deblending():
 
                 if antialias:
                     if hstpsf:
-                        B=np.hstack([apply_resampling_window(ssl.fftconvolve(B[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same')).flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
-                        var=np.hstack([ssl.fftconvolve(var[:,l].reshape(self.shapeLR),self.PSF_HST**2,mode='same').flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
+                        Y=np.hstack([apply_resampling_window(ssl.fftconvolve(Y[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same')).flatten()[:,np.newaxis] for l in xrange(Y.shape[1]) ])
+                        var=np.hstack([ssl.fftconvolve(var[:,l].reshape(self.shapeLR),self.PSF_HST**2,mode='same').flatten()[:,np.newaxis] for l in xrange(Y.shape[1]) ])
                     else:
-                        B=np.hstack([apply_resampling_window(B[:,l].reshape(self.shapeLR)).flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
+                        Y=np.hstack([apply_resampling_window(Y[:,l].reshape(self.shapeLR)).flatten()[:,np.newaxis] for l in xrange(Y.shape[1]) ])
                 else:
                     if hstpsf:
-                        B=np.hstack([ssl.fftconvolve(B[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same').flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
+                        Y=np.hstack([ssl.fftconvolve(Y[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same').flatten()[:,np.newaxis] for l in xrange(Y.shape[1]) ])
 
                 #normalize intensity maps in flux to get flux-calibrated estimated spectra
                 for a in xrange(A.shape[1]):
@@ -355,7 +355,7 @@ class Deblending():
 
 
 
-                if regul==True:
+                if regul==True: #apply regularization
                     if self.background:
                         A_=A[:,:-1]
                     else:
@@ -365,16 +365,21 @@ class Deblending():
                          support[A_[:,a]>0.1*np.max(A_[:,a])]=True
 
                     Y_sig2=np.var(B[~support,:],axis=0)
-                    res = regulDeblendFunc(A_, B,
+                    res = regulDeblendFunc(A_, Y,
                                     mask=True,ng=50,split=True,two_steps=True,l_method='glasso_bic',
                                     c_method='gridge_cv', cv=None,maskOnly=True, corrflux=True,
                                     support=support,#smooth=np.array([[0.5,1,0.5]])/2.,
                                     intercept=True,Y_sig2=Y_sig2)
-                    #self.tmp_sources[j][:, i*delta:(i+1)*delta]=res[0]
+
+
+                    self.spatialMask[j][i]=support
+
+                    # get
                     self.tmp_sources[j][:-1, i*delta:(i+1)*delta]=res[0]
                     self.tmp_sources[j][-1, i*delta:(i+1)*delta]=res[1]*A.shape[0]
+
+                    #store all elements for checking purposes
                     self.listMask[j][i]=res[2]
-                    self.spatialMask[j][i]=support
                     self.listccoeff[j][i]=res[3]
                     self.listlcoeff[j][i]=res[4]
                     self.listY[j][i]=res[5]
@@ -386,10 +391,10 @@ class Deblending():
                     self.listSig2[j][i]=res[11]
 
                 else:
-                    self.tmp_sources[j][:, i*delta:(i+1)*delta] = np.linalg.lstsq(A, B)[0]
+                    self.tmp_sources[j][:, i*delta:(i+1)*delta] = np.linalg.lstsq(A, Y)[0]
 
 
-                # get spectra variance : if
+                # get spectra variance :
                 inv=np.linalg.pinv(A)
                 self.tmp_var[j][:, i*delta:(i+1)*delta] = \
                             np.array([np.sum(inv**2*col, axis=1) for col in var.T]).T
@@ -413,53 +418,29 @@ class Deblending():
             self.varSources[i] = np.sum([self.filtResp[j]*self.tmp_var[j][i]
                 for j in xrange(len(self.filtResp))], axis=0)/weigthTot
 
-    def getTotSpectra(self):
+
+    def rebuildCube(self):
         """
-        Combine spectra estimated on each HST image
+        Create estimated cube
         """
+        tmp_sources = self.tmp_sources
 
-        self.spectraTot = np.zeros((self.nbSources, self.cubeLR.shape[0]))
-        self.varSpectraTot = np.zeros((self.nbSources, self.cubeLR.shape[0]))
-
-        delta = self.cubeLR.shape[0]/float(self.nBands)
-        tmp = []
-        tmpVar = []
-        for j in xrange(len(self.filtResp)):
-            tmp.append(np.zeros_like(self.spectraTot))
-            tmpVar.append(np.zeros_like(self.spectraTot))
-            for i in xrange(self.nBands):
-                for k in xrange(self.nbSources):
-                    tmp[j][k, int(i*delta):int((i+1)*delta)] = \
-                       np.sum(np.outer(self.tmp_sources[j][k, int(i*delta):int((i+1)*delta)],
-                                       self.listIntensityMapLRConvolClean[j][i][k]),axis=1)
-                    tmpVar[j][k,int(i*delta):int((i+1)*delta)] = \
-                          self.tmp_var[j][k,int(i*delta):int((i+1)*delta)]* \
-                            np.sum(self.listIntensityMapLRConvolClean[j][i][k])**2
-        self.spectraTot = np.sum([self.filtResp[l]*tmp[l] for l in xrange(len(self.filtResp))], axis=0)/ \
-                                np.sum([self.filtResp[l] for l in xrange(len(self.filtResp))],axis=0)
-
-        self.varSpectraTot = np.sum([self.filtResp[l]*tmpVar[l] for l in xrange(len(self.filtResp))], axis=0)/ \
-                                 np.sum([self.filtResp[l] for l in xrange(len(self.filtResp))], axis=0)
-
-
-    def rebuildCube(self,sources,tmp_sources=None):
-        """
-        Create
-        """
-        if tmp_sources is None:
-            tmp_sources = self.tmp_sources
         cubeRebuilt = np.zeros((self.cubeLR.shape[0],self.cubeLR.shape[1]*self.cubeLR.shape[2]))
         delta = self.cubeLR.shape[0]/float(self.nBands)
+
         for i in xrange(self.nBands):
             tmp = []
-            weights = np.sum([self.filtResp[l][int(i*delta):int((i+1)*delta)]
+            weightTot = np.sum([self.filtResp[l][int(i*delta):int((i+1)*delta)]
                             for l in xrange(len(self.filtResp))], axis=0)
+
             for j in xrange(len(self.filtResp)):
                 tmp.append(np.zeros_like(cubeRebuilt[int(i*delta):int((i+1)*delta),:]))
                 tmp[j] = np.dot(tmp_sources[j][:,int(i*delta):int((i+1)*delta)].T,self.listIntensityMapLRConvol[j][i])
+
             cubeRebuilt[int(i*delta):int((i+1)*delta),:] = np.sum(
-                    [(self.filtResp[l][int(i*delta):int((i+1)*delta)]/weights)[:,np.newaxis]*tmp[l]
+                    [(self.filtResp[l][int(i*delta):int((i+1)*delta)]/weightTot)[:,np.newaxis]*tmp[l]
                     for l in xrange(len(self.filtResp))], axis=0)
+
         cubeRebuilt=cubeRebuilt.reshape(self.cubeLR.shape)
         return cubeRebuilt
 
@@ -483,7 +464,7 @@ class Deblending():
             bw = closing(image > thresh, square(2))
             label_image = label(bw)
             for region in regionprops(label_image):
-                # skip small images
+                # skip small regions
                 if region.area < 3:
                     label_image[label_image == region.label] = 0
 
@@ -497,7 +478,8 @@ class Deblending():
                      (np.sum(segmap[:,:2] == k)== np.sum(segmap == k)) or \
                     (np.sum(segmap[-2:] == k)== np.sum(segmap == k)) or \
                     (np.sum(segmap[:,-2:] == k)== np.sum(segmap == k)):
-                    pass # remove objects on the border of the image that are less than two pixels wide
+                    # remove objects on the border of the image that are less than two pixels wide
+                    pass
                 else:
                     label_image[segmap == k] = i
                     i = i+1
@@ -523,8 +505,8 @@ class Deblending():
         """
         cat = {}
         for k, key in enumerate(self.listHST_ID):
-            cat[key] = Spectrum(data=self.spectraTot[k], var=self.varSpectraTot[k], wave=self.src.spectra['MUSE_TOT'].wave)
+            cat[key] = Spectrum(data=self.sources[k], var=self.varSources[k], wave=self.src.spectra['MUSE_TOT'].wave)
 
         if self.background is True:
-            cat['bg'] = Spectrum(data=self.spectraTot[k-1], wave=self.src.spectra['MUSE_TOT'].wave)
+            cat['bg'] = Spectrum(data=self.sources[k-1], wave=self.src.spectra['MUSE_TOT'].wave)
         return cat
