@@ -23,7 +23,7 @@ import astropy.io.fits as pyfits
 from regularization import regulDeblendFunc
 from deblend_utils import convertFilt, calcFSF, apply_resampling_window, normalize,\
                         getSpatialShift, generateMoffatIm, approxNNLS,\
-                        convertAbundanceMap, getMainSupport, ADMM_soft_neg, generatePSF_HST,GCV
+                        convertIntensityMap, getMainSupport, ADMM_soft_neg, generatePSF_HST,GCV
 
 
 DEFAULT_HSTFILTER606 = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'HST_ACS_WFC.F606W_81.dat')
@@ -65,7 +65,7 @@ class Deblending():
     sources: list
         list of spectra estimated during the process (non calibrated)
 
-    listAbundanceMap (HR,LR,LRConvol) : list
+    listIntensityMap (HR,LR,LRConvol) : list
     list of Abundance Map of each object detected, at each step :
         High resolution, after subsampling, and after convolution
 
@@ -205,6 +205,7 @@ class Deblending():
         """
         self.listImagesLR = []
         for filt in xrange(len(self.filtResp)):
+
             # build muse image based on the spectral response filter
             imMUSE = (self.src.cubes['MUSE_CUBE']*self.filtResp[filt][:, np.newaxis, np.newaxis]).sum(axis=0)
             self.listImagesLR.append(imMUSE)
@@ -215,7 +216,7 @@ class Deblending():
             # get spatial shift (dx,dy)
             self.listShift[filt] = getSpatialShift(imMUSE, imHST, self.betaFSF, fwhm_muse, PSF_HST)
 
-    def createAbundanceMap(self, thresh=None, segmap=None, background=False):
+    def createIntensityMap(self, segmap=None, thresh=None,  background=False):
         """
         Create intensity maps from HST images and segmentation map.
 
@@ -236,40 +237,38 @@ class Deblending():
 
         self.listHST_ID = self.getHST_ID()
 
-        self.listAbundanceMapHR = []
+        self.listIntensityMapHR = []
 
         # for each HST filter, create the high resolution intensity matrix (nbSources x Nb pixels )
         for j in xrange(len(self.listImagesHR)):
-            abundanceMapHR = np.zeros((self.nbSources,self.listImagesHR[0].shape[0]*self.listImagesHR[0].shape[1]))
+            intensityMapHR = np.zeros((self.nbSources,self.listImagesHR[0].shape[0]*self.listImagesHR[0].shape[1]))
             mask = np.zeros(self.listImagesHR[0].shape)
 
-            if self.background is True:  # if background is True, put abundanceMap of background in last position (estimated spectrum of background will also be last)
+            if self.background is True:  # if background is True, put intensityMap of background in last position (estimated spectrum of background will also be last)
                 mask[:] = 1.
-                abundanceMapHR[np.max(self.labelHR)] = mask.copy().flatten()
+                intensityMapHR[np.max(self.labelHR)] = mask.copy().flatten()
                 mask[:] = 0
 
             for k in xrange(1,np.max(self.labelHR)+1):
                 mask[self.labelHR == k] = np.maximum(self.listImagesHR[j].data[self.labelHR==k],10**(-9))#avoid negative abundances
 
-                abundanceMapHR[k-1] = mask.copy().flatten()  # k-1 to manage the background that have label 0 but is pushed to the last position
+                intensityMapHR[k-1] = mask.copy().flatten()  # k-1 to manage the background that have label 0 but is pushed to the last position
                 mask[:] = 0
 
-            self.listAbundanceMapHR.append(abundanceMapHR)
+            self.listIntensityMapHR.append(intensityMapHR)
 
-    def findSources(self, U=None, hstpsf=True, antialias=True, nonneg=True,
-                    alpha=2, estimateAbundance=False, tikho=False,regul=False):
+    def findSources(self,  hstpsf=True, antialias=True, nonneg=True,
+                    alpha=2, regul=False):
         """
-        U: spatial support of abundances (for new estimations using OMP)
-        hstpsf: apply hst psf on MUSE or not
+        hstpsf: apply hst psf on MUSE or not (if not the transfert function from HST to MUSE
+                                              is estimated and used on HST images instead of MUSE PSF)
         antialias: apply antialias filter or not
-        nonneg: soft penalization for spectra estimation or not
+        regul: add regularization or not
         alpha: regularization parameter
         """
-        self.convolvedCube = np.zeros_like(self.cubeLR)
         self.sources = np.zeros((self.nbSources, self.cubeLR.shape[0]))
         self.varSources = np.zeros((self.nbSources, self.cubeLR.shape[0]))
-        self.listAbundanceMapLRConvol = []
-        self.listAbundanceMapLRConvolClean = []
+        self.listIntensityMapLRConvol = []
         self.tmp_sources = []
         self.tmp_var = []
         self.listMask = []
@@ -283,10 +282,11 @@ class Deblending():
         self.spatialMask = []
         self.listRSS = []
         self.listSig2 = []
+
+
         # If there are several HR images the process is applied on each image
         # and then the estimated spectra are combined using a mean weighted by the response filters
         for j in xrange(len(self.listImagesHR)):
-            print j
             self.listMask.append([])
             self.listAlphas.append([])
             self.listAlphasMin.append([])
@@ -301,8 +301,8 @@ class Deblending():
             self.tmp_sources.append(np.zeros_like(self.sources))
             self.tmp_var.append(np.zeros_like(self.sources))
 
-            self.listAbundanceMapLRConvol.append([])
-            self.listAbundanceMapLRConvolClean.append([])
+            self.listIntensityMapLRConvol.append([])
+            self.listIntensityMapLRConvolClean.append([])
 
             delta = int(self.cubeLR.shape[0]/float(self.nBands))
             for i in xrange(self.nBands):
@@ -317,19 +317,21 @@ class Deblending():
                 self.spatialMask[j].append([])
                 self.listRSS[j].append([])
                 self.listSig2[j].append([])
-                abundanceMapLRConvol = convertAbundanceMap(self.listAbundanceMapHR[j],
+
+
+                #Create intensity maps
+                intensityMapLRConvol = convertIntensityMap(self.listIntensityMapHR[j],
                     self.src.cubes['MUSE_CUBE'][0,:,:], self.listImagesHR[j],self.listFWHM[i],
                     self.betaFSF, self.listShift[j], antialias=antialias,psf_hst=None)
-                # abundanceMapLRConvol[abundanceMapLRConvol<0]=10**(-5) #Trunc negative abundances (from noisy negative HST pixels)
 
-                ## TEST TO REMOVE CONVOLUTION WINGS
-                U = getMainSupport(abundanceMapLRConvol[:-1], alpha=0.999)
-                abundanceMapLRConvol[:-1][~U] = 0
+                ## truncate intensity maps support after onvolution
+                U = getMainSupport(intensityMapLRConvol[:-1], alpha=0.999)
+                intensityMapLRConvol[:-1][~U] = 0
 
                 if self.background is True:
-                    abundanceMapLRConvol[-1] = 1.
+                    intensityMapLRConvol[-1] = 1.
 
-                A = abundanceMapLRConvol.T
+                A = intensityMapLRConvol.T
                 B = self.cubeLR[i*delta:(i+1)*delta].reshape(
                         self.cubeLR[i*delta:(i+1)*delta].shape[0],
                         self.cubeLR.shape[1]*self.cubeLR.shape[2]).T
@@ -340,7 +342,6 @@ class Deblending():
                 if antialias:
                     if hstpsf:
                         B=np.hstack([apply_resampling_window(ssl.fftconvolve(B[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same')).flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
-                        #B=np.hstack([apply_resampling_window(ssl.convolve2d(B[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same',boundary='symm')).flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
                         var=np.hstack([ssl.fftconvolve(var[:,l].reshape(self.shapeLR),self.PSF_HST**2,mode='same').flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
                     else:
                         B=np.hstack([apply_resampling_window(B[:,l].reshape(self.shapeLR)).flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
@@ -348,29 +349,13 @@ class Deblending():
                     if hstpsf:
                         B=np.hstack([ssl.fftconvolve(B[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same').flatten()[:,np.newaxis] for l in xrange(B.shape[1]) ])
 
-                if j == 0:  # build a convolved cube for tests purposes
-                    self.convolvedCube[i*delta:(i+1)*delta] = \
-                                       B.T.reshape(B.shape[1], self.shapeLR[0], self.shapeLR[1])
-
+                #normalize intensity maps in flux to get flux-calibrated estimated spectra
                 for a in xrange(A.shape[1]):
                     A[:,a]=A[:,a]/np.sum(A[:,a])
-                    #A[:,a]=A[:,a]/np.linalg.norm(A[:,a])
-                inv=np.linalg.pinv(A)
-                if nonneg:
-                    if j==0:
-                        gcv2=GCV(A,B[:,0])
-                        alpha1= gcv2.getMin()
-                        print "alpha: ", alpha1
-                    self.tmp_sources[j][:, i*delta:(i+1)*delta] = ADMM_soft_neg(A, B, alpha=alpha1)
 
-                    #self.tmp_sources[j][:, i*delta:(i+1)*delta] = np.array([so.nnls(A, b)[0] for b in B.T]).T
-                elif tikho:
-                    if j==0:
-                        gcv2=GCV(A,B[:,0])
-                        alpha1= gcv2.getMin()
-                        #print "alpha: ", alpha1
-                    self.tmp_sources[j][:, i*delta:(i+1)*delta] = np.array([sla.lsmr(A, b,damp=alpha1)[0] for b in B.T]).T
-                elif regul==True:
+
+
+                if regul==True:
                     if self.background:
                         A_=A[:,:-1]
                     else:
@@ -378,11 +363,8 @@ class Deblending():
                     support=np.zeros(A.shape[0]).astype(bool)
                     for a in xrange(A_.shape[1]):
                          support[A_[:,a]>0.1*np.max(A_[:,a])]=True
-                    #im=np.max(A,axis=1)
-                    #support=im>0.1*np.max(im)
-                    #support=np.ones(im).astype(bool)
+
                     Y_sig2=np.var(B[~support,:],axis=0)
-                    #Y_sig2=np.mean(var,axis=0)
                     res = regulDeblendFunc(A_, B,
                                     mask=True,ng=50,split=True,two_steps=True,l_method='glasso_bic',
                                     c_method='gridge_cv', cv=None,maskOnly=True, corrflux=True,
@@ -405,35 +387,14 @@ class Deblending():
 
                 else:
                     self.tmp_sources[j][:, i*delta:(i+1)*delta] = np.linalg.lstsq(A, B)[0]
+
+
+                # get spectra variance : if
+                inv=np.linalg.pinv(A)
                 self.tmp_var[j][:, i*delta:(i+1)*delta] = \
                             np.array([np.sum(inv**2*col, axis=1) for col in var.T]).T
 
-                self.listAbundanceMapLRConvolClean[j].append(abundanceMapLRConvol.copy())
-                if estimateAbundance:
-                    # Estimation of abundances:
-                    # we have to recompute the abundance map by inversing again the system
-                    # save old abundanceMap
-
-                    B = self.cubeLR[i*delta:(i+1)*delta].reshape(
-                            self.cubeLR[i*delta:(i+1)*delta].shape[0],
-                            self.cubeLR.shape[1]*self.cubeLR.shape[2])
-                    A = self.tmp_sources[j][:, i*delta:(i+1)*delta].T
-
-                    if self.background:
-                        #U = np.array([(row/np.max(row)) > 0.0001 for row in abundanceMapLRConvol[:-1]])
-                        #U = getMainSupport(abundanceMapLRConvol[:-1], alpha=0.99)
-                        #U=np.ones_like(U).astype(int)
-                        for it in xrange(abundanceMapLRConvol.shape[1]):
-                            if np.sum(U[:, it]) > 0:
-                                abundanceMapLRConvol[:-1, it][U[:, it]] = \
-                                    so.nnls(A[:,:-1][:,U[:, it]],B[:, it]-A[:,-1]*abundanceMapLRConvol[-1,it])[0]
-                    else:
-                        #U=np.array([(row/np.max(row)) > 0.01 for row in abundanceMapLRConvol[:-1]])
-                        U=getMainSupport(abundanceMapLRConvol, alpha=0.99)
-                        for it in xrange(abundanceMapLRConvol.shape[1]):
-                            abundanceMapLRConvol[:, it] = so.nnls(A, B[:, it])[0]
-
-                self.listAbundanceMapLRConvol[j].append(abundanceMapLRConvol)
+                self.listIntensityMapLRConvol[j].append(intensityMapLRConvol)
 
         self.combineSpectra()
         self.cubeRebuilt = self.rebuildCube(self.sources)
@@ -442,6 +403,9 @@ class Deblending():
         self.getTotSpectra()
 
     def combineSpectra(self):
+        """
+        Combine spectra estimated on each HST image
+        """
         weigthTot = np.sum([self.filtResp[j] for j in xrange(len(self.filtResp))], axis=0)
         for i in xrange(self.nbSources):
             self.sources[i] = np.sum([self.filtResp[j]*self.tmp_sources[j][i]
@@ -450,6 +414,10 @@ class Deblending():
                 for j in xrange(len(self.filtResp))], axis=0)/weigthTot
 
     def getTotSpectra(self):
+        """
+        Combine spectra estimated on each HST image
+        """
+
         self.spectraTot = np.zeros((self.nbSources, self.cubeLR.shape[0]))
         self.varSpectraTot = np.zeros((self.nbSources, self.cubeLR.shape[0]))
 
@@ -463,10 +431,10 @@ class Deblending():
                 for k in xrange(self.nbSources):
                     tmp[j][k, int(i*delta):int((i+1)*delta)] = \
                        np.sum(np.outer(self.tmp_sources[j][k, int(i*delta):int((i+1)*delta)],
-                                       self.listAbundanceMapLRConvolClean[j][i][k]),axis=1)
+                                       self.listIntensityMapLRConvolClean[j][i][k]),axis=1)
                     tmpVar[j][k,int(i*delta):int((i+1)*delta)] = \
                           self.tmp_var[j][k,int(i*delta):int((i+1)*delta)]* \
-                            np.sum(self.listAbundanceMapLRConvolClean[j][i][k])**2
+                            np.sum(self.listIntensityMapLRConvolClean[j][i][k])**2
         self.spectraTot = np.sum([self.filtResp[l]*tmp[l] for l in xrange(len(self.filtResp))], axis=0)/ \
                                 np.sum([self.filtResp[l] for l in xrange(len(self.filtResp))],axis=0)
 
@@ -475,6 +443,9 @@ class Deblending():
 
 
     def rebuildCube(self,sources,tmp_sources=None):
+        """
+        Create
+        """
         if tmp_sources is None:
             tmp_sources = self.tmp_sources
         cubeRebuilt = np.zeros((self.cubeLR.shape[0],self.cubeLR.shape[1]*self.cubeLR.shape[2]))
@@ -485,7 +456,7 @@ class Deblending():
                             for l in xrange(len(self.filtResp))], axis=0)
             for j in xrange(len(self.filtResp)):
                 tmp.append(np.zeros_like(cubeRebuilt[int(i*delta):int((i+1)*delta),:]))
-                tmp[j] = np.dot(tmp_sources[j][:,int(i*delta):int((i+1)*delta)].T,self.listAbundanceMapLRConvol[j][i])
+                tmp[j] = np.dot(tmp_sources[j][:,int(i*delta):int((i+1)*delta)].T,self.listIntensityMapLRConvol[j][i])
             cubeRebuilt[int(i*delta):int((i+1)*delta),:] = np.sum(
                     [(self.filtResp[l][int(i*delta):int((i+1)*delta)]/weights)[:,np.newaxis]*tmp[l]
                     for l in xrange(len(self.filtResp))], axis=0)
@@ -504,6 +475,10 @@ class Deblending():
         self.cubeRebuiltCont = self.rebuildCube(self.sourcesCont, self.tmp_sourcesCont)
 
     def getLabel(self, image=None, thresh=None, segmap=None):
+        """
+        If no segmentation map create one by thresholding image (ndarray) by thres (float).
+        If given segmap, create a new segmap with contiguous indices
+        """
         if segmap is None:  # apply threshold
             bw = closing(image > thresh, square(2))
             label_image = label(bw)
@@ -517,11 +492,12 @@ class Deblending():
             label_image = np.zeros(segmap.shape, dtype='int')
             i = 0
             for k in sorted(set(segmap.flatten())):
+
                 if (np.sum(segmap[:2] == k)== np.sum(segmap == k)) or \
                      (np.sum(segmap[:,:2] == k)== np.sum(segmap == k)) or \
                     (np.sum(segmap[-2:] == k)== np.sum(segmap == k)) or \
                     (np.sum(segmap[:,-2:] == k)== np.sum(segmap == k)):
-                    pass
+                    pass # remove objects on the border of the image that are less than two pixels wide
                 else:
                     label_image[segmap == k] = i
                     i = i+1
@@ -531,6 +507,10 @@ class Deblending():
 
 
     def getHST_ID(self):
+        """
+        Get the list of HST ids for each label of labelHR
+        """
+
         if self.background is True:
             listHST_ID = [int(self.segmap[self.labelHR == k][0]) for k in xrange(1, self.nbSources)]
         else:
@@ -538,6 +518,9 @@ class Deblending():
         return listHST_ID
 
     def getsp(self):
+        """
+        Get estimated spectra as a dict (with the HST ids as keys) of mpdaf Spectra
+        """
         cat = {}
         for k, key in enumerate(self.listHST_ID):
             cat[key] = Spectrum(data=self.spectraTot[k], var=self.varSpectraTot[k], wave=self.src.spectra['MUSE_TOT'].wave)
