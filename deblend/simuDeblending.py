@@ -16,7 +16,7 @@ class SimuDeblending:
 
     def __init__(self, listCenter, listSpectra, listRadius, listIntens,
                  shapeLR=np.array([41,41]), shapeHR=np.array([161,161]),
-                                 PSFMuse=None, FiltResp=None, listHiddenSources=[]):
+                                 PSFMuse=None, FiltResp=None, listHiddenSources=[],genFromCubeHR=True):
         """
         FSFMuse: at high resolution
         """
@@ -39,7 +39,7 @@ class SimuDeblending:
             # self.PSFMuse=generateGaussianIm(self.shapeHR/2,self.shapeHR,sig=4.)
             # self.PSFMuse=generateGaussianIm(self.shapeLR/2,self.shapeLR,sig=5.)
             # self.PSFMuse=generateMoffatIm(self.shapeHR/2,self.shapeHR,3*self.d[0],2.7)
-            self.PSFMuse = generateMoffatIm(shape=(15, 15), center=(7, 7), alpha=3, beta=2.8,dim=None)
+            self.PSFMuse = generateMoffatIm(shape=(15, 15), center=(7, 7), alpha=4, beta=2.8,dim=None)
         else:
             self.PSFMuse = PSFMuse  # f*f
         #self.generatePSFMatrixHR()
@@ -47,15 +47,27 @@ class SimuDeblending:
         self.generateImHR()  # N1*N2
 
         self.CubeHR = self.generateCubeHR()
+        self.ImHR2 = np.sum(self.CubeHR,axis=0)
         self.subMatrix = np.zeros((self.ImHR.size, self.shapeLR[0]*self.shapeLR[1]))
 
         self.CubeLR = np.zeros((self.LBDA,self.shapeLR[0],self.shapeLR[1]))
-        for k in xrange(self.LBDA):
+        #for k in xrange(self.LBDA):
             #imConvol=np.dot(self.matrixPSF,self.CubeHR[k].flatten()).reshape(self.shapeHR)
             #self.CubeLR[k],self.downsamplingMatrix,self.Mh,self.Mv = downsampling(imConvol,self.shapeLR,returnMatrix=True)#downsampling
-            self.CubeLR[k],self.downsamplingMatrix,self.Mh, self.Mv = \
-                       downsampling(self.CubeHR[k], self.shapeLR, returnMatrix=True)#downsampling
-        self.CubeLR = ssl.fftconvolve(self.CubeLR, self.PSFMuse[np.newaxis,:,:], mode='same') #l*n1*n2
+        self.mapAbundancesLR = np.zeros((self.nbS, self.shapeLR[0]*self.shapeLR[1]))
+        self.mapAbundancesLRConvol = np.zeros((self.nbS, self.shapeLR[0]*self.shapeLR[1]))
+        for k in xrange(self.nbS):
+            self.mapAbundancesLR[k]=downsampling(self.mapAbundances[k].reshape(self.shapeHR), self.shapeLR).flatten()
+            self.mapAbundancesLRConvol[k]=ssl.fftconvolve(self.mapAbundancesLR[k].reshape(self.shapeLR), self.PSFMuse, mode='same').flatten()
+
+        if genFromCubeHR==True:
+            self.CubeLR,self.downsamplingMatrix,self.Mh, self.Mv = \
+                       downsampling(self.CubeHR, self.shapeLR, returnMatrix=True)#downsampling
+            self.CubeLR = ssl.fftconvolve(self.CubeLR, self.PSFMuse[np.newaxis,:,:], mode='same') #l*n1*n2
+        else:
+            _,self.downsamplingMatrix,self.Mh, self.Mv = \
+                    downsampling(self.CubeHR[0:1], self.shapeLR, returnMatrix=True)#downsampling
+            self.CubeLR = np.dot(self.mapAbundancesLRConvol.T,self.DicSources.T).T.reshape(self.LBDA,self.shapeLR[0],self.shapeLR[1])
 
 
 
@@ -119,11 +131,11 @@ class SimuDeblending:
     def generateSrc(self, src):
         self.src=src
         self.src.cubes['MUSE_CUBE'].data = self.CubeLR
-        self.src.images['HST_F606W'].data = self.ImHR
-        self.src.images['HST_F775W'].data = self.ImHR
-        self.src.images['HST_F814W'].data = self.ImHR
-        self.src.images['HST_F850LP'].data = self.ImHR
-        self.src.header['FSF00FWA'] = 3*2*np.sqrt(2**(1/2.8)-1)
+        self.src.images['HST_F606W'].data = self.ImHR2
+        self.src.images['HST_F775W'].data = self.ImHR2
+        self.src.images['HST_F814W'].data = self.ImHR2
+        self.src.images['HST_F850LP'].data = self.ImHR2
+        self.src.header['FSF00FWA'] = 4*0.2*2*np.sqrt(2**(1/2.8)-1)
         self.src.header['FSF00FWB'] = 0
         self.src.header['FSF00BET'] = 2.8
 

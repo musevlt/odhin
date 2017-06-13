@@ -11,10 +11,13 @@ from scipy.ndimage.filters import convolve
 import scipy.optimize as so
 from scipy.interpolate import interp1d
 import astropy.units as units
+import astropy.io.fits as pyfits
 import math
 from muse_analysis.imphot import fit_image_photometry, rescale_hst_like_muse
 from scipy import ndimage
+import os
 
+import matplotlib.pyplot as plt
 
 def block_sum(ar, fact):
     sx, sy = ar.shape
@@ -154,8 +157,9 @@ def ADMM_soft_neg(A, b, x0=None, nIter=20, alpha=10, rho=1.):
     for k in xrange(nIter):
         #x=np.dot(np.linalg.inv(np.dot(a.T,a)+rho*np.eye(a.shape[1])),np.dot(a.T,y)+rho*(z-h))
         x = np.linalg.solve(aTa, aTb+rho*alpha*(z-h))
-        z = l2_(x, alpha/rho)
+        z = l1_(x+h, alpha/rho)
         h = h+(x-z)
+        #print np.sum((x-z)**2)
     return x
 
 
@@ -163,13 +167,13 @@ def l1_(x, beta):
     #x[x < 0] = x[x < 0]/(beta+1)
     #return x
     z = x.copy()
-    z[x < 0] = x[x < 0]/(beta+1)
+    z[z < 0] = z[z < 0]/(beta+1)
     return z
 
 
 def l2_(x, beta):
     z = x.copy()
-    #z[x < 0] = 0
+    z[z < 0] = 0
     z[x < -beta] = (1-beta/np.abs(x[x < -beta]))*x[x < -beta]
     return z
 
@@ -226,7 +230,7 @@ def regrid_hst_like_muse(hst, muse, inplace=True, antialias=True):
     return hst.align_with_image(muse, cutoff=0.0, flux=True, inplace=True,antialias=antialias)
 
 def getHSTIm(hst,muse,fwhm=0.67, beta=2.8,ddx=0.0,ddy=0.0,scale=1,bg=0,
-                         margin=2.0,taper=9):
+                         margin=2.0,taper=9,psf_hst=None):
 
     dy, dx = muse.get_step(unit=units.arcsec)
 
@@ -358,7 +362,7 @@ def getHSTIm(hst,muse,fwhm=0.67, beta=2.8,ddx=0.0,ddy=0.0,scale=1,bg=0,
                                bg,
                                scale,
                                fwhm,
-                               beta).view(dtype=complex)
+                               beta,psf_hst).view(dtype=complex)
 
     # Invert the best-fit FFTs to obtain the best-fit MUSE and HST images.
 
@@ -367,7 +371,7 @@ def getHSTIm(hst,muse,fwhm=0.67, beta=2.8,ddx=0.0,ddy=0.0,scale=1,bg=0,
     return hst_im
 
 def _xy_moffat_model_fn(fx, fy, rsq, hstfft, wfft, subtracted, xshift, yshift,
-                        dx, dy, bg, scale, fwhm, beta):
+                        dx, dy, bg, scale, fwhm, beta, psf_hst=None):
 
     """This function is designed to be passed to lmfit to fit the FFT of
     an HST image to the FFT of a MUSE image on the same coordinate
@@ -435,6 +439,9 @@ def _xy_moffat_model_fn(fx, fy, rsq, hstfft, wfft, subtracted, xshift, yshift,
        The term due to scattering in the atmosphere that widens
        the wings of the PSF compared to a Gaussian. A common
        choice for this valus is 2.0.
+    psf_hst : array or None
+        If not None, the psf used is not the whole MUSE PSF but the transfert
+        function between MUSE and HST
 
     Returns:
     --------
@@ -456,8 +463,18 @@ def _xy_moffat_model_fn(fx, fy, rsq, hstfft, wfft, subtracted, xshift, yshift,
     asq = fwhm**2 / 4.0 / (2.0**(1.0 / beta) - 1.0)
 
     # Compute an image of a Moffat function centered at pixel 0,0.
-
+    betaHST = 1.6
+    fwhm_hst=0.085
     im = 1.0 / (1.0 + rsq / asq)**beta
+    #plt.imshow(im)
+    #plt.show()
+    if psf_hst is not None:
+        asq_hst = fwhm_hst**2 / 4.0 / (2.0**(1.0 / betaHST) - 1.0)
+        psf_hst = 1.0 / (1.0 + rsq / asq_hst)**betaHST
+
+        tmp_dir='/home/data/MUSE/tmp/'
+        im=pyfits.open(tmp_dir+'kernel_%s.fits'%fwhm)[0].data
+        im=np.roll(im,(im.shape[1]/2+1,im.shape[1]/2+1),axis=(0,1))
 
     # Obtain the discrete Fourier Transform of the Moffat function.
     # The function is even, meaning that its Fourier transform is
@@ -493,17 +510,18 @@ def _xy_moffat_model_fn(fx, fy, rsq, hstfft, wfft, subtracted, xshift, yshift,
 
     return model.view(dtype=float)
 
-def convertAbundanceMap(abundanceMap,muse,hst,fwhm,beta,shift,antialias=True):
+def convertAbundanceMap(abundanceMap,muse,hst,fwhm,beta,shift,antialias=True,psf_hst=None):
     abundanceMapMuse=np.zeros((abundanceMap.shape[0],muse.data.size))
     hst_ref=hst.copy()
 
     for i in xrange(abundanceMap.shape[0]):
         hst_ref.data=abundanceMap[i].reshape(hst_ref.shape)
         hst_ref_muse=regrid_hst_like_muse(hst_ref, muse, inplace=False,antialias=antialias)
+
         hst_ref_muse=rescale_hst_like_muse(hst_ref_muse, muse, inplace=False)
         hst_ref_muse.mask[:]=False
 
-        im=getHSTIm(hst_ref_muse,muse,fwhm,beta,ddx=shift[0],ddy=shift[1],taper=0)
+        im=getHSTIm(hst_ref_muse,muse,fwhm,beta,ddx=shift[0],ddy=shift[1],taper=0,psf_hst=psf_hst)
         abundanceMapMuse[i]=im.flatten()
     return abundanceMapMuse
 
@@ -557,3 +575,26 @@ def getMainSupport(u, alpha=0.999):
         keepNumber=np.sum(s<alpha*s[-1])
         mask[i,np.argsort(row,axis=None)[-keepNumber:]]=True
     return mask
+
+class GCV:
+    def __init__(self,A,Y):
+        self.A=A
+        self.Y=Y
+        self.D,self.U=np.linalg.eigh(np.dot(A.T,A))
+        self.V=self.U.T
+
+    def getGCV(self,lmbda):
+        if lmbda<0:
+            return np.inf
+        n=float(self.A.shape[0])
+        p=float(self.A.shape[1])
+        self.G_l=np.dot(np.dot(self.U,np.diag(1/(self.D+lmbda))),self.V)
+        self.S1=np.dot(np.dot(self.A,self.G_l),self.A.T)
+        self.z=np.dot(self.S1,self.Y)
+
+        g=1/n*np.sum((self.Y-self.z)**2)/(1-np.trace(self.S1)/n)**2
+        return g
+
+    def getMin(self):
+        lmbda=so.minimize(fun=self.getGCV,x0=[1],bounds=[(0,None)]).x
+        return lmbda
