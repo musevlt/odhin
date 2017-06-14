@@ -15,11 +15,13 @@ import astropy.io.fits as pyfits
 import math
 from muse_analysis.imphot import fit_image_photometry, rescale_hst_like_muse
 from scipy import ndimage
-import os
 
 import matplotlib.pyplot as plt
 
 def block_sum(ar, fact):
+    """
+    Subsample a matrix *ar* by a integer factor *fact* using sums.
+    """
     sx, sy = ar.shape
     X, Y = np.ogrid[0:sx, 0:sy]
     regions = sy/fact[1] * (X/fact[0]) + Y/fact[1]
@@ -29,7 +31,10 @@ def block_sum(ar, fact):
 
 
 def generatePSF_HST(alphaHST, betaHST, shape=(375, 375), shapeMUSE=(25, 25)):
-    """Generate PSF HST at MUSE resolution"""
+    """Generate PSF HST at MUSE resolution with Moffat model.
+    To increase precision (as this PSF is sharp) the construction is made on a larger array
+    then subsampled.
+    """
     PSF_HST_HR = generateMoffatIm(shape=shape, center=(shape[0]/2, shape[1]/2),
                                       alpha=alphaHST, beta=betaHST, dim=None)
     factor = (shape[0]/shapeMUSE[0], shape[1]/shapeMUSE[1])
@@ -37,6 +42,17 @@ def generatePSF_HST(alphaHST, betaHST, shape=(375, 375), shapeMUSE=(25, 25)):
     PSF_HST[PSF_HST < 0.001] = 0
     PSF_HST = PSF_HST/np.sum(PSF_HST)
     return PSF_HST
+
+def getMainSupport(u, alpha=0.999):
+    """
+    Get mask containing fraction alpha of total map intensity.
+    """
+    mask = np.zeros_like(u).astype(bool)
+    for i,row in enumerate(u):
+        s=np.cumsum(np.sort(row)[::-1])
+        keepNumber=np.sum(s<alpha*s[-1])
+        mask[i,np.argsort(row,axis=None)[-keepNumber:]]=True
+    return mask
 
 
 def apply_resampling_window(im):
@@ -80,7 +96,8 @@ def convertFilt(filt,wave=None,x=None):
 
 def calcFSF(a, b, beta, listLambda, center=(12, 12), shape=(25, 25), dim='MUSE'):
     """
-    Build list of FSF images (np arrays) from parameters a,b and beta. fwhm=a+b*lmbda, and beta is the Moffat parameter.
+    Build list of FSF images (np arrays) from parameters a,b and beta.
+    fwhm=a+b*lmbda, and beta is the Moffat parameter.
     """
     listFSF = []
     for lmbda in listLambda:
@@ -92,15 +109,18 @@ def calcFSF(a, b, beta, listLambda, center=(12, 12), shape=(25, 25), dim='MUSE')
 
 
 def Moffat(r, alpha, beta):
+    """
+    Compute Moffat values for array of distances *r* and Moffat parameters *alpha* and *beta*
+    """
     return (beta-1)/(math.pi*alpha**2)*(1+(r/alpha)**2)**(-beta)
 
-def generateMoffatIm(center=(12,12),shape=(25,25),alpha=2,beta=2.5,a=0.,b=0.,dim='MUSE'):
+def generateMoffatIm(center=(12,12),shape=(25,25),alpha=2,beta=2.5,dx=0.,dy=0.,dim='MUSE'):
     """
-    by default alpha is supposed to be given in arsec, if not it is given in MUSE pixel.
+    By default alpha is supposed to be given in arsec, if not it is given in MUSE pixel.
     a,b allow to decenter slightly the Moffat image.
     """
     ind = np.indices(shape)
-    r = np.sqrt(((ind[0]-center[0]+a)**2 + ((ind[1]-center[1]+b))**2))
+    r = np.sqrt(((ind[0]-center[0]+dx)**2 + ((ind[1]-center[1]+dy))**2))
     if dim == 'MUSE':
         r = r*0.2
     elif dim == 'HST':
@@ -111,6 +131,9 @@ def generateMoffatIm(center=(12,12),shape=(25,25),alpha=2,beta=2.5,a=0.,b=0.,dim
 
 
 def normalize(a, axis=-1, order=2, returnCoeff=False):
+    """
+    normalize array along axis
+    """
     l2 = np.atleast_1d(np.linalg.norm(a, order, axis))
     l2[l2 == 0] = 1
     if returnCoeff is True:
@@ -119,7 +142,28 @@ def normalize(a, axis=-1, order=2, returnCoeff=False):
         return a / np.expand_dims(l2, axis)
 
 
-def getSpatialShift(imMUSE_0, imHST_0, beta_muse, fwhm_muse, PSF_HST):
+def getSpatialShift(imMUSE_0, imHST_0, beta_muse, fwhm_muse,):
+    """
+    Parameters
+    ----------
+
+    imMUSE_0 : `mpdaf.obj.Image`
+        The MUSE image or cube against which the HST image must be aligned.
+    imHST_0 : `mpdaf.obj.Image`
+          The HST image to be shifted.
+    fwhm_muse : `float`
+        fwhm of MUSE FSF
+    beta_muse : `float`
+        Moffat beta parameter of MUSE FSF
+
+
+
+    Returns
+    -------
+    shift : `(float,float)`
+       Shift in (x,y) to apply to HST image
+
+    """
     imHST_1 = imHST_0.copy()
     regrid_hst_like_muse(imHST_1, imMUSE_0, inplace=True)
     rescale_hst_like_muse(imHST_1, imMUSE_0, inplace=True)
@@ -129,64 +173,61 @@ def getSpatialShift(imMUSE_0, imHST_0, beta_muse, fwhm_muse, PSF_HST):
     return (res.dx.value, res.dy.value)
 
 
-def approxNNLS(A, b, lmbda):
-    """Solve ||Ax-b|| w.r.t. x>0"""
-    inv = np.linalg.pinv(A)
-    x1 = np.dot(inv, b)
-    if len(x1.shape) == 1:
-        x1 = x1[:, np.newaxis]
-    x2 = np.zeros_like(x1)
-    mask = (x1 < 0).astype(int)
-    for l in xrange(x1.shape[1]):
-        H=np.diag(mask[:,l])
-        x2[:,l]=np.linalg.lstsq(np.vstack([A,lmbda*H]),np.concatenate([b[:,l],np.zeros_like(x1[:,l])]))[0]
-    return x2
 
-
-def ADMM_soft_neg(A, b, x0=None, nIter=20, alpha=10, rho=1.):
+def convertAbundanceMap(intensityMap,muse,hst,fwhm,beta,shift,antialias=False,psf_hst=True):
     """
-    Solve ||Ax-b|| w.r.t. x>0
+    Parameters
+    ----------
+    intensityMap : `ndarray`
+        The matrix of intensity maps (one row per object) at HST resolution
+
+    hst : `mpdaf.obj.Image`
+       The HST image to be resampled.
+    muse : `mpdaf.obj.Image` of `mpdaf.obj.Cube`
+       The MUSE image or cube to use as the template for the HST image.
+    fwhm : `float`
+        fwhm of MUSE FSF
+    beta : `float`
+        Moffat beta parameter of MUSE FSF
+    shift : `(float,float)`
+        Shifts to apply to HST image
+    antialias : `bool`
+        Use antialising filter or not.
+        Default to False (because a broad convolution is applied afterwards)
+    psf_hst : `bool`
+        Use HST-MUSE transfert function instead of MUSE FSF. Default to True
+
+
+    Returns
+    -------
+    intensityMapMuse : `ndarray`
+       The matrix of intensity maps (one row per object) at MUSE resolution
+       (and convolved by MUSE FSF or HST-MUSE transfert function)
     """
-    if x0 is None:
-        x0 = np.random.rand(A.shape[1], b.shape[1])
-    x = x0
-    h = np.random.rand(x.shape[0], x.shape[1])
-    z = np.random.rand(x.shape[0], x.shape[1])
-    aTa = np.dot(A.T, A)+rho*alpha*np.eye(A.shape[1])
-    aTb = np.dot(A.T, b)
-    for k in xrange(nIter):
-        #x=np.dot(np.linalg.inv(np.dot(a.T,a)+rho*np.eye(a.shape[1])),np.dot(a.T,y)+rho*(z-h))
-        x = np.linalg.solve(aTa, aTb+rho*alpha*(z-h))
-        z = l1_(x+h, alpha/rho)
-        h = h+(x-z)
-        #print np.sum((x-z)**2)
-    return x
+    intensityMapMuse = np.zeros((intensityMap.shape[0], muse.data.size))
+    hst_ref = hst.copy()
+
+    for i in xrange(intensityMap.shape[0]):
+        hst_ref.data = intensityMap[i].reshape(hst_ref.shape)
+        hst_ref_muse = regrid_hst_like_muse(hst_ref, muse, inplace=False,
+                                            antialias=antialias)
+
+        hst_ref_muse = rescale_hst_like_muse(hst_ref_muse, muse, inplace=False)
+        hst_ref_muse.mask[:] = False
+        im = getHSTIm(hst_ref_muse, muse, fwhm, beta, ddx=shift[0],
+                    ddy=shift[1], taper=0, psf_hst=psf_hst)
+        intensityMapMuse[i] = im.flatten()
+    return intensityMapMuse
 
 
-def l1_(x, beta):
-    #x[x < 0] = x[x < 0]/(beta+1)
-    #return x
-    z = x.copy()
-    z[z < 0] = z[z < 0]/(beta+1)
-    return z
 
 
-def l2_(x, beta):
-    z = x.copy()
-    z[z < 0] = 0
-    z[x < -beta] = (1-beta/np.abs(x[x < -beta]))*x[x < -beta]
-    return z
-
-
-def soft_(x, beta):
-    """
-    Soft non negative thresholding
-    """
-    return np.maximum(np.abs(x+beta/2.)-beta/2., 0)*np.sign(x)
+### functions taken from muse_analysis and slighlty modified
 
 
 def regrid_hst_like_muse(hst, muse, inplace=True, antialias=True):
-    """Resample an HST image onto the spatial coordinate grid of a given
+    """
+    Resample an HST image onto the spatial coordinate grid of a given
     MUSE image or MUSE cube.
 
     Parameters
@@ -221,6 +262,7 @@ def regrid_hst_like_muse(hst, muse, inplace=True, antialias=True):
         muse = muse[0,:,:]
 
     # Mask the zero-valued blank margins of the HST image.
+    #### Removed because we work on intensity maps with lot of zeros
 
     #np.ma.masked_inside(hst.data, -1e-10, 1e-10, copy=False)
 
@@ -230,7 +272,7 @@ def regrid_hst_like_muse(hst, muse, inplace=True, antialias=True):
     return hst.align_with_image(muse, cutoff=0.0, flux=True, inplace=True,antialias=antialias)
 
 def getHSTIm(hst,muse,fwhm=0.67, beta=2.8,ddx=0.0,ddy=0.0,scale=1,bg=0,
-                         margin=2.0,taper=9,psf_hst=None):
+                         margin=2.0,taper=9,psf_hst=False):
 
     dy, dx = muse.get_step(unit=units.arcsec)
 
@@ -371,7 +413,7 @@ def getHSTIm(hst,muse,fwhm=0.67, beta=2.8,ddx=0.0,ddy=0.0,scale=1,bg=0,
     return hst_im
 
 def _xy_moffat_model_fn(fx, fy, rsq, hstfft, wfft, subtracted, xshift, yshift,
-                        dx, dy, bg, scale, fwhm, beta, psf_hst=None):
+                        dx, dy, bg, scale, fwhm, beta, psf_hst=False):
 
     """This function is designed to be passed to lmfit to fit the FFT of
     an HST image to the FFT of a MUSE image on the same coordinate
@@ -439,8 +481,8 @@ def _xy_moffat_model_fn(fx, fy, rsq, hstfft, wfft, subtracted, xshift, yshift,
        The term due to scattering in the atmosphere that widens
        the wings of the PSF compared to a Gaussian. A common
        choice for this valus is 2.0.
-    psf_hst : array or None
-        If not None, the psf used is not the whole MUSE PSF but the transfert
+    psf_hst : bool
+        If True, the psf used is not the whole MUSE PSF but the transfert
         function between MUSE and HST
 
     Returns:
@@ -463,17 +505,13 @@ def _xy_moffat_model_fn(fx, fy, rsq, hstfft, wfft, subtracted, xshift, yshift,
     asq = fwhm**2 / 4.0 / (2.0**(1.0 / beta) - 1.0)
 
     # Compute an image of a Moffat function centered at pixel 0,0.
-    betaHST = 1.6
-    fwhm_hst=0.085
     im = 1.0 / (1.0 + rsq / asq)**beta
-    #plt.imshow(im)
-    #plt.show()
-    if psf_hst is not None:
-        asq_hst = fwhm_hst**2 / 4.0 / (2.0**(1.0 / betaHST) - 1.0)
-        psf_hst = 1.0 / (1.0 + rsq / asq_hst)**betaHST
 
+    if psf_hst is True: # get HST-MUSE transfert function corresponding to MUSE fwhm
         tmp_dir='/home/data/MUSE/tmp/'
         im=pyfits.open(tmp_dir+'kernel_%s.fits'%fwhm)[0].data
+
+        #center transfert function at pixel 0,0
         im=np.roll(im,(im.shape[1]/2+1,im.shape[1]/2+1),axis=(0,1))
 
     # Obtain the discrete Fourier Transform of the Moffat function.
@@ -510,21 +548,6 @@ def _xy_moffat_model_fn(fx, fy, rsq, hstfft, wfft, subtracted, xshift, yshift,
 
     return model.view(dtype=float)
 
-def convertAbundanceMap(abundanceMap,muse,hst,fwhm,beta,shift,antialias=True,psf_hst=None):
-    abundanceMapMuse=np.zeros((abundanceMap.shape[0],muse.data.size))
-    hst_ref=hst.copy()
-
-    for i in xrange(abundanceMap.shape[0]):
-        hst_ref.data=abundanceMap[i].reshape(hst_ref.shape)
-        hst_ref_muse=regrid_hst_like_muse(hst_ref, muse, inplace=False,antialias=antialias)
-
-        hst_ref_muse=rescale_hst_like_muse(hst_ref_muse, muse, inplace=False)
-        hst_ref_muse.mask[:]=False
-
-        im=getHSTIm(hst_ref_muse,muse,fwhm,beta,ddx=shift[0],ddy=shift[1],taper=0,psf_hst=psf_hst)
-        abundanceMapMuse[i]=im.flatten()
-    return abundanceMapMuse
-
 def _bevel_mask(mask, width):
     """Return a floating point image that is a smoothed version of a
     boolean mask array. It is important that pixels that are zero in
@@ -552,7 +575,8 @@ def _bevel_mask(mask, width):
     # First shave off 'width' pixels from all edges of the mask,
     # and return the result as a floating point array.
 
-    im = binary_erosion(mask, structure=np.ones((width, width))).astype(float)
+
+    im = ndimage.morphology.binary_erosion(mask, structure=np.ones((width, width))).astype(float)
 
     # Compute a [width,width] smoothing convolution mask.
 
@@ -565,36 +589,6 @@ def _bevel_mask(mask, width):
     return convolve(im, m)
 
 
-def getMainSupport(u, alpha=0.999):
-    """
-    Get mask containing fraction alpha of total map intensity.
-    """
-    mask = np.zeros_like(u).astype(bool)
-    for i,row in enumerate(u):
-        s=np.cumsum(np.sort(row)[::-1])
-        keepNumber=np.sum(s<alpha*s[-1])
-        mask[i,np.argsort(row,axis=None)[-keepNumber:]]=True
-    return mask
 
-class GCV:
-    def __init__(self,A,Y):
-        self.A=A
-        self.Y=Y
-        self.D,self.U=np.linalg.eigh(np.dot(A.T,A))
-        self.V=self.U.T
 
-    def getGCV(self,lmbda):
-        if lmbda<0:
-            return np.inf
-        n=float(self.A.shape[0])
-        p=float(self.A.shape[1])
-        self.G_l=np.dot(np.dot(self.U,np.diag(1/(self.D+lmbda))),self.V)
-        self.S1=np.dot(np.dot(self.A,self.G_l),self.A.T)
-        self.z=np.dot(self.S1,self.Y)
 
-        g=1/n*np.sum((self.Y-self.z)**2)/(1-np.trace(self.S1)/n)**2
-        return g
-
-    def getMin(self):
-        lmbda=so.minimize(fun=self.getGCV,x0=[1],bounds=[(0,None)]).x
-        return lmbda
