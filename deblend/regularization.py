@@ -492,7 +492,7 @@ def gridge_bic(X,Y,alphas=np.logspace(-7,3,100),intercept=True,multivar=False,
     return alphas[n_best]
 
 def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,100), intercept=True,
-              oneSig=False, method='gcv_spe', sig2=None, support=None):
+              oneSig=True, method='None', sig2=None, support=None):
     """
 
     Estimate coefficients using ridge regression and various methods for
@@ -523,7 +523,6 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,100), intercept=True,
     listAlpha=np.zeros((Y.shape[1]))
     listAlphaMin=np.zeros((Y.shape[1]))
     listRSS=[]
-    listSig2=[]
 
     if intercept:
         X_centr=X-np.mean(X,axis=0)
@@ -546,7 +545,7 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,100), intercept=True,
 
             alpha,rss=gridge_gcv_spectral(X_centr,Y_centr[:,k*ng:(k+1)*ng],alphas=alphas,Sig2=sig2[k*ng:(k+1)*ng],support=support)
             listAlpha[k*ng:(k+1)*ng]=alpha
-
+            listRSS.append(rss)
             Ridge=sklm.Ridge(alpha=alpha,fit_intercept=intercept,normalize=True)
             Ridge.fit(X,Y[:,k*ng:(k+1)*ng])
             coeff[:,k*ng:(k+1)*ng]=Ridge.coef_.T
@@ -561,13 +560,14 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,100), intercept=True,
                 alpha=RCV_slid.alpha_
 
             listAlpha[k*ng:(k+1)*ng]=alpha
+            listRSS.append(RCV_slid.cv_values_)
             Ridge=sklm.Ridge(alpha=alpha,fit_intercept=intercept,normalize=True)
             Ridge.fit(X,Y[:,k*ng:(k+1)*ng])
             coeff[:,k*ng:(k+1)*ng]=Ridge.coef_.T
             if intercept:
                 intercepts[:,k*ng:(k+1)*ng]=Ridge.intercept_.T
 
-    return coeff,intercepts,listAlpha,listAlphaMin,listRSS,listSig2
+    return coeff,intercepts,listAlpha,listAlphaMin,listRSS
 
 
 
@@ -585,8 +585,7 @@ def gridge_gcv_spectral(X,Y,support,alphas=np.logspace(-7,3,100),
         support : mask of samples (pixels) with enough signal, where the cross validation will be applied
         alphas : list of regul parameters to test
         Sig2 : variance of each wavelength slice (1d array n_targets)
-        cross_spectral
-
+        cross_spectral : do the cross-validation on previous and following spectral band.
 
     Output:
     ------
@@ -729,7 +728,7 @@ def regulDeblendFunc(X,Y,l_method='glasso_bic',ng=1,c_method='RCV',g_method=None
         else:
             c_intercepts=np.zeros(Y.shape[1])
     elif c_method =='gridge_cv': # preferred method : sliding Ridge GCV
-        c_coeff,c_intercepts,c_alphas,c_alphas_min,listRSS,listSig2 =gridge_cv(X,Y_c,ng=ng,intercept=intercept,support=support,sig2=Y_sig2)
+        c_coeff,c_intercepts,c_alphas,c_alphas_min,listRSS =gridge_cv(X,Y_c,ng=ng,intercept=intercept,support=support,sig2=Y_sig2)
 
     # correct flux
     if corrflux==True:
@@ -740,7 +739,7 @@ def regulDeblendFunc(X,Y,l_method='glasso_bic',ng=1,c_method='RCV',g_method=None
     intercepts=c_intercepts + l_intercepts
 
     if c_method == 'gridge_cv':
-        return res,intercepts,listMask,c_coeff,l_coeff,Y,Y_l,Y_c,c_alphas,c_alphas_min,listRSS,listSig2
+        return res,intercepts,listMask,c_coeff,l_coeff,Y,Y_l,Y_c,c_alphas,c_alphas_min,listRSS
     return res,intercepts
 
 def corrFlux(X,Y,beta,mask=None):

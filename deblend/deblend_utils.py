@@ -174,7 +174,7 @@ def getSpatialShift(imMUSE_0, imHST_0, beta_muse, fwhm_muse,):
 
 
 
-def convertAbundanceMap(intensityMap,muse,hst,fwhm,beta,shift,antialias=False,psf_hst=True):
+def convertIntensityMap(intensityMap,muse,hst,fwhm,beta,shift,antialias=False,psf_hst=True):
     """
     Parameters
     ----------
@@ -219,6 +219,68 @@ def convertAbundanceMap(intensityMap,muse,hst,fwhm,beta,shift,antialias=False,ps
         intensityMapMuse[i] = im.flatten()
     return intensityMapMuse
 
+def convertIntensityMapV2(intensityMap,muse,hst,fwhm,beta,shift,antialias=False,psf_hst=True):
+    """
+    Parameters
+    ----------
+    intensityMap : `ndarray`
+        The matrix of intensity maps (one row per object) at HST resolution
+
+    hst : `mpdaf.obj.Image`
+       The HST image to be resampled.
+    muse : `mpdaf.obj.Image` of `mpdaf.obj.Cube`
+       The MUSE image or cube to use as the template for the HST image.
+    fwhm : `float`
+        fwhm of MUSE FSF
+    beta : `float`
+        Moffat beta parameter of MUSE FSF
+    shift : `(float,float)`
+        Shifts to apply to HST image
+    antialias : `bool`
+        Use antialising filter or not.
+        Default to False (because a broad convolution is applied afterwards)
+    psf_hst : `bool`
+        Use HST-MUSE transfert function instead of MUSE FSF. Default to True
+
+
+    Returns
+    -------
+    intensityMapMuse : `ndarray`
+       The matrix of intensity maps (one row per object) at MUSE resolution
+       (and convolved by MUSE FSF or HST-MUSE transfert function)
+    """
+    intensityMapMuse = np.zeros((intensityMap.shape[0], muse.data.size))
+    hst_ref = hst.copy()
+
+
+    #tmp_dir='./tmp/'
+    #imPSFMUSE = pyfits.open(tmp_dir+'kernel_%s.fits'%fwhm)[0].data
+    #imPSFMUSE=imPSFMUSE/np.sum(imPSFMUSE)
+    #alpha= fwhm / 2.0 / np.sqrt((2.0**(1.0 / beta) - 1.0))
+    #print alpha,beta
+    #imPSFMUSE2 = generateMoffatIm(center=(50,50),shape=(101,101),alpha=alpha,beta=beta,dim='HST')
+    #return imPSFMUSE,imPSFMUSE2
+
+    if psf_hst == True: #get HST-MUSE transfert function
+        tmp_dir='./tmp/'
+        imPSFMUSE = pyfits.open(tmp_dir+'kernel_%s.fits'%fwhm)[0].data
+        imPSFMUSE=imPSFMUSE/np.sum(imPSFMUSE)
+    else:
+        alpha= fwhm / 2.0 / np.sqrt((2.0**(1.0 / beta) - 1.0))
+        imPSFMUSE = generateMoffatIm(center=(50,50),shape=(101,101),alpha=alpha,beta=beta,dim='HST')
+    for i in xrange(intensityMap.shape[0]):
+        hst_ref.data = intensityMap[i].reshape(hst_ref.shape)
+
+
+        hst_ref.data = ssl.fftconvolve(hst_ref.data,imPSFMUSE,mode='same')
+        hst_ref_muse = regrid_hst_like_muse(hst_ref, muse, inplace=False,
+                                            antialias=antialias)
+
+        hst_ref_muse = rescale_hst_like_muse(hst_ref_muse, muse, inplace=False)
+        hst_ref_muse.mask[:] = False
+
+        intensityMapMuse[i] = hst_ref_muse.data.flatten()
+    return intensityMapMuse
 
 
 
@@ -262,9 +324,9 @@ def regrid_hst_like_muse(hst, muse, inplace=True, antialias=True):
         muse = muse[0,:,:]
 
     # Mask the zero-valued blank margins of the HST image.
-    #### Removed because we work on intensity maps with lot of zeros
-
+    #### Removed here because we work on intensity maps with lot of zeros
     #np.ma.masked_inside(hst.data, -1e-10, 1e-10, copy=False)
+
 
     # Resample the HST image onto the same coordinate grid as the MUSE
     # image.
@@ -508,7 +570,7 @@ def _xy_moffat_model_fn(fx, fy, rsq, hstfft, wfft, subtracted, xshift, yshift,
     im = 1.0 / (1.0 + rsq / asq)**beta
 
     if psf_hst is True: # get HST-MUSE transfert function corresponding to MUSE fwhm
-        tmp_dir='/home/data/MUSE/tmp/'
+        tmp_dir='./tmp/'
         im=pyfits.open(tmp_dir+'kernel_%s.fits'%fwhm)[0].data
 
         #center transfert function at pixel 0,0
