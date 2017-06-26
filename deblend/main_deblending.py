@@ -180,7 +180,7 @@ class Deblending():
             # get spatial shift (dx,dy)
             self.listShift[filt] = getSpatialShift(imMUSE, imHST, self.betaFSF, fwhm_muse, PSF_HST)
 
-    def createIntensityMap(self, segmap=None, thresh=None,  background=False):
+    def createIntensityMap(self, segmap=None, thresh=None):
         """
         Create intensity maps from HST images and segmentation map.
         To be called before calling findSources()
@@ -191,9 +191,6 @@ class Deblending():
 
         thres : (not used if segmap)
             threshold to use on HST image to segment
-        background : `bool`
-            if True a sky background source (spatially uniform ) will be
-            estimated alongside the others spectra
 
         """
 
@@ -203,11 +200,7 @@ class Deblending():
             self.labelHR = self._getLabel(self.listImagesHR[0].data, thresh)
         else:
             self.labelHR = self._getLabel(segmap=segmap)
-        self.background = background
-        if self.background is False:
-            self.nbSources = np.max(self.labelHR)
-        else:
-            self.nbSources = np.max(self.labelHR)+1
+        self.nbSources = np.max(self.labelHR)+1 # add one for background
 
         self.listHST_ID = self._getHST_ID()
 
@@ -218,15 +211,14 @@ class Deblending():
             intensityMapHR = np.zeros((self.nbSources,self.listImagesHR[0].shape[0]*self.listImagesHR[0].shape[1]))
             mask = np.zeros(self.listImagesHR[0].shape)
 
-            if self.background is True:  # if background is True, put intensityMap of background in last position (estimated spectrum of background will also be last)
-                mask[:] = 1.
-                intensityMapHR[np.max(self.labelHR)] = mask.copy().flatten()
-                mask[:] = 0
+            #put intensityMap of background in first position (estimated spectrum of background will also be first)
+            mask[:] = 1.
+            intensityMapHR[0] = mask.copy().flatten()
+            mask[:] = 0
 
             for k in xrange(1,np.max(self.labelHR)+1):
                 mask[self.labelHR == k] = np.maximum(self.listImagesHR[j].data[self.labelHR==k],10**(-9))#avoid negative abundances
-
-                intensityMapHR[k-1] = mask.copy().flatten()  # k-1 to manage the background that have label 0 but is pushed to the last position
+                intensityMapHR[k] = mask.copy().flatten()  # k-1 to manage the background that have label 0 but is pushed to the last position
                 mask[:] = 0
 
             self.listIntensityMapHR.append(intensityMapHR)
@@ -281,9 +273,6 @@ class Deblending():
         # If there are several HR images the process is applied on each image
         # and then the estimated spectra are combined using a mean weighted by the response filters
         for j in xrange(len(self.listImagesHR)):
-            print j
-#            if j>0:
-#                continue
             self.listAlphas.append([])
             self.listRSS.append([])
             if store:
@@ -327,11 +316,11 @@ class Deblending():
                     antialias=antialias,psf_hst=transfert_hst)
 
                 ## truncate intensity maps support after convolution
-                supp = getMainSupport(intensityMapLRConvol[:-1], alpha=0.999)
-                intensityMapLRConvol[:-1][~supp] = 0
+                supp = getMainSupport(intensityMapLRConvol[1:], alpha=0.999)
+                intensityMapLRConvol[1:][~supp] = 0
 
-                if self.background is True: #put ones everywhere for background intensity map
-                    intensityMapLRConvol[-1] = 1.
+                #put ones everywhere for background intensity map
+                intensityMapLRConvol[0] = 1.
 
                 U = intensityMapLRConvol.T
                 Y = self.cubeLR[i*delta:(i+1)*delta].reshape(
@@ -369,13 +358,9 @@ class Deblending():
 
                 if regul==True: # apply regularization
 
-
-                    if self.background:
-                        #remove background from intensity matrix as
-                        #intercept is used instead
-                        U_=U[:,:-1]
-                    else:
-                        U_=U
+                    #remove background from intensity matrix as
+                    #intercept is used instead
+                    U_=U[:,1:]
 
                     # generate support
                     support=np.zeros(U.shape[0]).astype(bool)
@@ -386,17 +371,15 @@ class Deblending():
                     res = regulDeblendFunc(U_, Y, Y_c=Y_c,
                                     ng=50, l_method='glasso_bic',
                                     c_method='gridge_cv', corrflux=True,
-                                    support=support, intercept=self.background,
+                                    support=support, intercept=True,
                                     Y_sig2=Y_sig2,filt_w=filt_w,oneSig=True)
 
 
                     # get spectra estimation
-                    if self.background:
-                        self.tmp_sources[j][:-1, i*delta:(i+1)*delta]=res[0]
-                        # for background spectrum get intercept (multiply by number of pixels to get tot flux)
-                        self.tmp_sources[j][-1, i*delta:(i+1)*delta]=res[1]*U.shape[0]
-                    else:
-                        self.tmp_sources[j][:, i*delta:(i+1)*delta]=res[0]
+
+                    self.tmp_sources[j][1:, i*delta:(i+1)*delta]=res[0]
+                    # for background spectrum get intercept (multiply by number of pixels to get tot flux)
+                    self.tmp_sources[j][0, i*delta:(i+1)*delta]=res[1]*U.shape[0]
 
                     #store all elements for checking purposes
                     self.listAlphas[j][i]=res[8]
@@ -536,19 +519,8 @@ class Deblending():
             label_image = np.zeros(segmap.shape, dtype='int')
             i = 0
             for k in sorted(set(segmap.flatten())):
-
-                if (np.sum(segmap[:15] == k)== np.sum(segmap == k)) or \
-                     (np.sum(segmap[:,:15] == k)== np.sum(segmap == k)) or \
-                    (np.sum(segmap[-15:] == k)== np.sum(segmap == k)) or \
-                    (np.sum(segmap[:,-15:] == k)== np.sum(segmap == k)):
-                    # remove objects on the border of the image that are less than 15 pixels wide (~2 pix MUSE)
-                    #pass
-                    label_image[segmap == k] = i
-                    i = i+1
-
-                else:
-                    label_image[segmap == k] = i
-                    i = i+1
+                label_image[segmap == k] = i
+                i = i+1
 
         return label_image
 
@@ -556,13 +528,10 @@ class Deblending():
 
     def _getHST_ID(self):
         """
-        Get the list of HST ids for each label of labelHR
+        Get the list of HST ids for each label of labelHR (first is background 'bg')
         """
 
-        if self.background is True:
-            listHST_ID = [int(self.segmap[self.labelHR == k][0]) for k in xrange(1, self.nbSources)]
-        else:
-            listHST_ID = [int(self.segmap[self.labelHR == k][0]) for k in xrange(1, self.nbSources+1)]
+        listHST_ID = ['bg']+[int(self.segmap[self.labelHR == k][0]) for k in xrange(1, self.nbSources)]
         return listHST_ID
 
     def getsp(self):
@@ -573,6 +542,4 @@ class Deblending():
         for k, key in enumerate(self.listHST_ID):
             cat[key] = Spectrum(data=self.sources[k], var=self.varSources[k], wave=self.src.spectra['MUSE_TOT'].wave)
 
-        if self.background is True:
-            cat['bg'] = Spectrum(data=self.sources[k-1], wave=self.src.spectra['MUSE_TOT'].wave)
         return cat
