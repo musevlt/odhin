@@ -60,7 +60,7 @@ def glasso_bic(X,Y,ng=2,intercept=True,multivar=True,listMask=None,
     return coeff,intercepts
 
 
-def lasso_bic(X,Y,intercept=True,multivar=True,greedy=False,averaged=True):
+def lasso_bic(X,Y,intercept=True,multivar=True,greedy=False,averaged=True,returnAll=False):
     """
     Estimate spectra from X, Y using BIC.
 
@@ -100,6 +100,8 @@ def lasso_bic(X,Y,intercept=True,multivar=True,greedy=False,averaged=True):
     n_models = X.shape[1]
     n_targets = Y.shape[1]
     coef_path_ = []
+    if returnAll:
+        coef_path_all = []
     listComb=[]
     if greedy==False: # compute all possible combinations of non-nul objects
         for k in xrange(1,n_models+1):
@@ -130,8 +132,11 @@ def lasso_bic(X,Y,intercept=True,multivar=True,greedy=False,averaged=True):
     # compute the coeffs (estimated spectra) for each possible model.
     for ind in listComb:
         coef_path_.append(np.linalg.lstsq(X[:,ind],Y)[0])
+        if returnAll:
+            coef_path_all.append(np.linalg.lstsq(X[:,ind],Y_all)[0])
 
     K = np.log(n_samples*n_targets)  # BIC factor
+
 
 
     # compute mean squared errors
@@ -168,6 +173,10 @@ def lasso_bic(X,Y,intercept=True,multivar=True,greedy=False,averaged=True):
     if intercept:
         r0=r0+n_targets*K
 
+    if returnAll:
+        likelihood = np.concatenate([np.array([n_samples * np.sum(np.log(np.mean(Y**2,axis=0)))]),n_samples * np.sum(np.log(mean_squared_error),axis=1)])
+        penalty=np.concatenate([np.array([r0-n_samples * np.sum(np.log(np.mean(Y**2,axis=0)))]),K * df])
+
     if averaged==True: # we now get back to the whole dataset
         Y=Y_all
         n_targets=Y.shape[1]
@@ -189,7 +198,8 @@ def lasso_bic(X,Y,intercept=True,multivar=True,greedy=False,averaged=True):
         intercepts = Y_offset - np.dot(X_offset, coeff)
     else:
         intercepts=np.zeros_like(Y[0])
-
+    if returnAll:
+        return coef_path_all,likelihood,penalty
     return coeff,intercepts,np.concatenate([np.array([r0]),criterion_])
 
 def mad(arr):
@@ -202,9 +212,41 @@ def mad(arr):
     return np.median(np.abs(arr - med))
 
 def getLinesSupportList(listSpe,w=10,wmin=1,wmax=20,alpha=1.4,beta=1.2,
-                       n_sig=1,f=0.6,f2=0.7,returnAll=False,filt=None,localConstraint=True):
+                       n_sig=1.2,f=0.6,returnAll=False,filt=None,localConstraint=True):
     """
     Get emission/absorption lines spectral support
+
+    Parameters
+    ----------
+    listSpe : list of 1d arrays (spectra of size lambda)
+        list of spectra where to seek lines
+    w: int
+        minimal width
+    wmin : int
+        min
+    wmax : int
+        min
+    alpha : float
+
+    beta : float
+
+    n_sig: float
+        A half-width corresponds to n_sig standard deviations.
+
+    f: float
+
+    returnAll : bool
+        return all intermediate results
+    filt: 1d-array (None by default)
+
+    localConstraint : bool
+
+
+
+    Output:
+    ------
+        listMask : list of masks (each mask is a boolean array of size lambda)
+
 
 
     """
@@ -228,10 +270,12 @@ def getLinesSupportList(listSpe,w=10,wmin=1,wmax=20,alpha=1.4,beta=1.2,
         listExtrema = spe_filt[listArgExtrema]
 
 
-        listKernel=genKernels(listWidth=np.concatenate([np.array([0.1]),np.arange(1,2*wmax+2,2)]),n=2*wmax+1)
+        listKernel=genKernels(listWidth=np.concatenate([np.array([0.1]),
+                                                        np.arange(1,2*wmax+2,2)]),n=2*wmax+1,n_sig=n_sig)
         nThresh=np.sum(np.abs(spe_filt[listArgExtrema])>alpha*sig_filt)
         for k,m in zip(listArgExtrema,listExtrema):
-            if (np.abs(spe_filt[k])>alpha*sig_filt) and ((localConstraint==False) or (spe[np.maximum(k-1,0):k+2]>np.sign(spe[k])*sig).all()):
+            if (np.abs(spe_filt[k])>alpha*sig_filt) and (
+                    (localConstraint==False) or (spe[np.maximum(k-1,0):k+2]>np.sign(spe[k])*sig).all()):
                 mask=np.zeros_like(spe).astype(bool)
                 kmin=np.maximum(k-wmax,0)
                 if k-wmax<0:
@@ -245,13 +289,14 @@ def getLinesSupportList(listSpe,w=10,wmin=1,wmax=20,alpha=1.4,beta=1.2,
                 width=calcWidth(line,listKernel=listKernel,n_sig=n_sig,
                                 listWidth=np.concatenate([np.array([0.1]),np.arange(1,2*wmax+2,2)]))
                 width=int(width)
+
                 if width>=2*wmin+1:
                     if len(np.nonzero(spe[np.maximum(k-width,0):k]<beta*sig)[0])>0:
-                        a=np.maximum(k-width,0)+np.nonzero(spe[np.maximum(k-width,0):k]<beta*sig)[0][-1]
+                        a=np.maximum(k-width,1)+np.nonzero(spe[np.maximum(k-width,0):k]<beta*sig)[0][-1]-1
                     else:
                         a=np.maximum(k-width,0)
                     if len(np.nonzero(spe[k:k+width+1]<beta*sig)[0])>0:
-                        b=k+np.nonzero(spe[k:k+width+1]<beta*sig)[0][0]
+                        b=k+np.nonzero(spe[k:k+width+1]<beta*sig)[0][0]+2
                     else:
                         b=k+width+1
                 else:
@@ -271,6 +316,22 @@ def getLinesSupportList(listSpe,w=10,wmin=1,wmax=20,alpha=1.4,beta=1.2,
 def genKernels(listWidth=np.arange(5,42,2),n=41,n_sig=2):
     """
     Generate list of gaussian kernels with varying widths
+
+    Parameters
+    ----------
+    listWidth : list of int
+        list of widths to be tested
+    n: int
+        length of a kernel 1d-array
+    n_sig: float
+         A half-width corresponds to n_sig standard deviations.
+
+
+    Output
+    ----------
+    listKernel: list of 1d-array
+        list of gaussian kernels with varying widths
+
     """
     listKernel=[]
     x=np.linspace(-20,20,n)
@@ -288,9 +349,17 @@ def calcWidth(spe,listKernel=None,n_sig=1,listWidth=np.arange(5,42,2)):
     ----------
     spe: 1d-array
         part of spectrum centered on the peak whose width has to estimated
-    listKernel:
+    listKernel: list of 1d-array
+        list of gaussian kernels with varying widths
+    n_sig: int
+         A half-width corresponds to n_sig standard deviations.
+    listWidth : list of int
+        list of widths to be tested
 
-    n_sig:
+    Output
+    ----------
+    res : int
+        estimated width
 
     """
     if listKernel is None:
@@ -342,15 +411,40 @@ def oneSigRuleRidge(LRCV):
     alpha: regularisation parameter
 
     """
-    ind=np.argmin(np.mean(np.mean(LRCV.cv_values_,axis=0),axis=0))
-    min_mse=np.mean(np.mean(LRCV.cv_values_,axis=0),axis=0)[ind]
-    cv=LRCV.cv_values_.shape[0]*LRCV.cv_values_.shape[1]
-    min_mse_std=np.std(np.std(LRCV.cv_values_,axis=0),axis=0)[ind]/np.sqrt(cv)
-    alpha=np.max([LRCV.alphas[i] for i in xrange(len(LRCV.alphas)) if np.mean(LRCV.cv_values_[:,:,i])<min_mse+min_mse_std])
+    rss=LRCV.cv_values_
+    alphas = LRCV.alphas
+    alpha = oneSigRuleMain(alphas,rss)
+#    ind=np.argmin(np.mean(np.mean(LRCV.cv_values_,axis=0),axis=0))
+#    min_mse=np.mean(np.mean(LRCV.cv_values_,axis=0),axis=0)[ind]
+#    cv=LRCV.cv_values_.shape[0]*LRCV.cv_values_.shape[1]
+#    min_mse_std=np.std(np.std(LRCV.cv_values_,axis=0),axis=0)[ind]/np.sqrt(cv)
+#    alpha=np.max([LRCV.alphas[i] for i in xrange(len(LRCV.alphas)) if np.mean(LRCV.cv_values_[:,:,i])<min_mse+min_mse_std])
+    return alpha
+
+def oneSigRuleMain(alphas,rss):
+    """
+    Get regularization parameter using 1-sig rule
+
+    Parameters
+    ----------
+    alphas: list of regularization parameters
+    rss: array of prediction errors (shape : n_samples, n_targets, n_alphas)
+
+    Returns
+    -------
+    alpha: regularisation parameter
+
+    """
+    ind=np.argmin(np.mean(np.mean(rss,axis=0),axis=0))
+    min_mse=np.mean(np.mean(rss,axis=0),axis=0)[ind]
+    cv=rss.shape[0]*rss.shape[1]
+    min_mse_std=np.std(np.std(rss,axis=0),axis=0)[ind]/np.sqrt(cv)
+    alpha=np.max([alphas[i] for i in xrange(len(alphas)) if np.mean(rss[:,:,i])<min_mse+min_mse_std])
     return alpha
 
 
-def glasso_cv(X,Y,ng=9,cv=10,alphas=np.logspace(-7,3,100),recompute=True,oneSig=True,
+
+def glasso_cv(X,Y,ng=9,cv=10,alphas=np.logspace(-5,2,50),recompute=True,oneSig=True,
               listMask=None,returnAlpha=False,intercept=True):
     """
 
@@ -432,7 +526,7 @@ def glasso_cv(X,Y,ng=9,cv=10,alphas=np.logspace(-7,3,100),recompute=True,oneSig=
     return coeff,intercepts
 
 
-def gridge_bic(X,Y,alphas=np.logspace(-7,3,100),intercept=True,multivar=False,
+def gridge_bic(X,Y,alphas=np.logspace(-5,2,50),intercept=True,multivar=False,
                averaged=True):
     """
     Estimate best regularization parameter alpha for ridge regression using BIC criterion.
@@ -491,8 +585,8 @@ def gridge_bic(X,Y,alphas=np.logspace(-7,3,100),intercept=True,multivar=False,
 
     return alphas[n_best]
 
-def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,100), intercept=True,
-              oneSig=True, method='None', sig2=None, support=None):
+def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,50), intercept=True,
+              oneSig=False, method='gcv_spe', sig2=None, support=None):
     """
 
     Estimate coefficients using ridge regression and various methods for
@@ -521,7 +615,6 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,100), intercept=True,
     RCV_slid=sklm.RidgeCV(alphas=alphas,fit_intercept=intercept,normalize=True,
                           store_cv_values=True)
     listAlpha=np.zeros((Y.shape[1]))
-    listAlphaMin=np.zeros((Y.shape[1]))
     listRSS=[]
 
     if intercept:
@@ -543,12 +636,13 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,100), intercept=True,
                 intercepts[:,k*ng:(k+1)*ng]=Ridge.intercept_.T
         elif method=='gcv_spe':
 
-            alpha,rss=gridge_gcv_spectral(X_centr,Y_centr[:,k*ng:(k+1)*ng],alphas=alphas,Sig2=sig2[k*ng:(k+1)*ng],support=support)
+            alpha,rss,beta=gridge_gcv_spectral(X_centr,Y_centr[:,k*ng:(k+1)*ng],alphas=alphas,Sig2=sig2[k*ng:(k+1)*ng],support=support,oneSig=oneSig)
             listAlpha[k*ng:(k+1)*ng]=alpha
-            listRSS.append(rss)
+            listRSS.append(rss.mean(axis=0).mean(axis=0))
             Ridge=sklm.Ridge(alpha=alpha,fit_intercept=intercept,normalize=True)
             Ridge.fit(X,Y[:,k*ng:(k+1)*ng])
             coeff[:,k*ng:(k+1)*ng]=Ridge.coef_.T
+            #coeff[:,k*ng:(k+1)*ng] = beta
             if intercept:
                 intercepts[:,k*ng:(k+1)*ng]=Ridge.intercept_.T
 
@@ -567,12 +661,12 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,100), intercept=True,
             if intercept:
                 intercepts[:,k*ng:(k+1)*ng]=Ridge.intercept_.T
 
-    return coeff,intercepts,listAlpha,listAlphaMin,listRSS
+    return coeff,intercepts,listAlpha,listRSS
 
 
 
-def gridge_gcv_spectral(X,Y,support,alphas=np.logspace(-7,3,100),
-                Sig2=None,cross_spectral =False):
+def gridge_gcv_spectral(X,Y,support,alphas=np.logspace(-5,2,50),
+                Sig2=None,cross_spectral =False,oneSig=True,maxAlphaFrac=2.):
     """
 
     Estimate coefficients using ridge regression and various methods for
@@ -580,17 +674,26 @@ def gridge_gcv_spectral(X,Y,support,alphas=np.logspace(-7,3,100),
 
     Parameters
     ----------
-        X : regressors (intensityMaps, n x k)
-        Y : data (n x lmbda)
-        support : mask of samples (pixels) with enough signal, where the cross validation will be applied
-        alphas : list of regul parameters to test
-        Sig2 : variance of each wavelength slice (1d array n_targets)
-        cross_spectral : do the cross-validation on previous and following spectral band.
+        X : 2d array (n pixels  x  k objects)
+            regressors (intensityMaps)
+        Y : 2d array (n pixels  x lmbda wavelengths)
+            data
+        support : 1d array of bool
+            mask of samples (pixels) with enough signal, where the cross validation will be applied
+        alphas : list of float
+            list of regul parameters to test
+        Sig2 :
+            variance of each wavelength slice (1d array n_targets)
+        cross_spectral : bool
+            do the cross-validation on previous and following spectral band.
+        maxAlphaFrac : float
+            fraction of the max singular value of X that will be the
+            upper limit for regularization parameter
 
     Output:
     ------
         alpha : estimated regularization parameter
-        rss : errors of prediction (ndarray n_alphas, n_samples, n_targets)
+        rss : errors of prediction (ndarray n_samples, n_targets,n_alphas)
     """
 
     Ys=Y[support]
@@ -602,20 +705,29 @@ def gridge_gcv_spectral(X,Y,support,alphas=np.logspace(-7,3,100),
     UtY=np.dot(U.T,Ys)
     listInd=np.nonzero(support)[0]
 
-    rss=np.zeros((len(alphas),len(listInd),Y.shape[1]))
+    rss=np.zeros((len(listInd),Y.shape[1],len(alphas)))
     for a,alpha in enumerate(alphas):
         S=(U * _diag_dot(sval**2/(sval**2+alpha),U.T).T).sum(-1) # get diag values of np.dot(Xs,np.dot(XtX,Xs.T))
         Xbeta=np.dot(U,_diag_dot(sval**2/(sval**2+alpha),UtY))
         if cross_spectral==False:
-            rss[a,:,:]=((Ys-Xbeta)/(1-S)[:,None])**2
+            rss[:,:,a]=((Ys-Xbeta)/(1-S)[:,None])**2
         else:
             res_left=((Ys[:,:-1]-Xbeta[:,1:])/(1-S)[:,None])**2
             res_right=((Ys[:,1:]-Xbeta[:,:-1])/(1-S)[:,None])**2
-            rss[a,:,0]=res_right[:,0]
-            rss[a,:,1:-1]=(res_left[:,:-1]*1*Sig2[2:]+res_right[:,1:]*Sig2[:-2])/sumSig2
-            rss[a,:,-1]=res_left[:,-1]
+            rss[0,:,a]=res_right[:,0]
+            rss[1:-1,:,a]=(res_left[:,:-1]*1*Sig2[2:]+res_right[:,1:]*Sig2[:-2])/sumSig2
+            rss[-1,:,a]=res_left[:,-1]
 
-    return alphas[np.argmin(np.mean(np.average(rss,axis=2,weights=1/Sig2),axis=1))],rss
+    if oneSig:
+        alpha = oneSigRuleMain(alphas,rss)
+    else:
+        alpha = alphas[np.argmin(np.mean(np.average(rss,axis=1,weights=1/Sig2),axis=0))]
+    if alpha>np.max(sval)*maxAlphaFrac:
+        #print alpha,np.max(sval)
+        alpha=np.max(sval)*maxAlphaFrac
+    #beta = np.dot(V.T,_diag_dot(sval/(sval**2+alpha),UtY))
+    beta=None
+    return alpha,rss,beta
 
 def _diag_dot( D, B):
     # compute dot(diag(D), B)
@@ -628,13 +740,7 @@ def _decomp_diag(v_prime, Q):
     # compute diagonal of the matrix: dot(Q, dot(diag(v_prime), Q^T))
     return (v_prime * Q ** 2).sum(axis=-1)
 
-def getNeighbors(X,Y,k,n,shape,listInd):
-    listI=[]
-    for i in xrange(-n,n+1):
-        for j in xrange(-n,n+1):
-            if k+i+j*shape[0] in listInd:
-                listI.append(int(k+i+j*shape[0]))
-    return listI
+
 
 def medfilt (x, k):
     """Apply a length-k median filter to a 1D array x.
@@ -654,12 +760,28 @@ def medfilt (x, k):
     return np.median (y, axis=1)
 
 
-def regulDeblendFunc(X,Y,l_method='glasso_bic',ng=1,c_method='RCV',g_method=None,cv_l=5,cv_c=None,
+def regulDeblendFunc(X,Y,Y_c=None,l_method='glasso_bic',ng=1,c_method='RCV',g_method=None,cv_l=5,cv_c=None,
     intercept=True,n_alphas=100,eps=1e-3,alpha_c=0.0001,oneSig=True,support=None,trueLines=None,
-                  multivar=True,recompute=True,filt_w=101,corrflux=True,Y_sig2=None):
+                  multivar=True,alphas=np.logspace(-5,2,50),recompute=True,filt_w=101,corrflux=True,Y_sig2=None):
+    """
 
+    Estimate coefficients using ridge regression and various methods for
+    regularization parameter estimation
+
+    Parameters
+    ----------
+        X : 2d array (n pixels  x  k objects)
+            regressors (intensityMaps)
+        Y : 2d array (n pixels  x lmbda wavelengths)
+            data
+
+
+    Output:
+    ------
+    """
     #get emission lines only (Y_l)
-    Y_c=np.vstack([medfilt(y,filt_w) for y in Y])
+    if Y_c is None:
+        Y_c=np.vstack([medfilt(y,filt_w) for y in Y])
     Y_l=Y-Y_c
 
     if trueLines is not None: # use prior knowlegde of lines support if given
@@ -670,11 +792,11 @@ def regulDeblendFunc(X,Y,l_method='glasso_bic',ng=1,c_method='RCV',g_method=None
         listSpe=[]
         for i in xrange(X.shape[1]-1):
             listSpe.append(np.dot(X[:,i:i+1].T,Y_l)[0])
-        if intercept:
+        if intercept: #use also last object
             listSpe.append(np.dot(X[:,X.shape[1]-1:].T,Y_l)[0])
 
         # Then we seek all spectral lines on this bunch of spectra
-        listMask=getLinesSupportList(listSpe,w=2,wmax=20,wmin=2,alpha=2.5,filt=None)
+        listMask=getLinesSupportList(listSpe,w=2,wmax=20,wmin=2,alpha=2.5,n_sig=1.4,filt=None)
 
     if l_method == 'glasso_bic': # preferred approach : group bic approach
         l_coeff,l_intercepts =glasso_bic(X,Y_l,ng=ng,listMask=listMask,intercept=intercept,
@@ -703,7 +825,7 @@ def regulDeblendFunc(X,Y,l_method='glasso_bic',ng=1,c_method='RCV',g_method=None
         X1=X
         Y_c1=Y_c
     if c_method == 'RCV':# find one global regul parameter by GCV
-        RCV = sklm.RidgeCV(alphas=np.logspace(-8,5,200),normalize=True,cv=cv_c,
+        RCV = sklm.RidgeCV(alphas=alphas,normalize=True,cv=cv_c,
                            store_cv_values=True,fit_intercept=intercept)
         RCV.fit(X1,Y_c1) # to avoid GCV instability we work with pixels with strong enough signal (*support*)
         c_coeff=RCV.coef_.T
@@ -728,7 +850,9 @@ def regulDeblendFunc(X,Y,l_method='glasso_bic',ng=1,c_method='RCV',g_method=None
         else:
             c_intercepts=np.zeros(Y.shape[1])
     elif c_method =='gridge_cv': # preferred method : sliding Ridge GCV
-        c_coeff,c_intercepts,c_alphas,c_alphas_min,listRSS =gridge_cv(X,Y_c,ng=ng,intercept=intercept,support=support,sig2=Y_sig2)
+        c_coeff,c_intercepts,c_alphas,listRSS = gridge_cv(
+                X,Y_c,ng=ng,intercept=intercept,support=support,sig2=Y_sig2,
+                oneSig=oneSig,alphas=alphas)
 
     # correct flux
     if corrflux==True:
@@ -739,7 +863,7 @@ def regulDeblendFunc(X,Y,l_method='glasso_bic',ng=1,c_method='RCV',g_method=None
     intercepts=c_intercepts + l_intercepts
 
     if c_method == 'gridge_cv':
-        return res,intercepts,listMask,c_coeff,l_coeff,Y,Y_l,Y_c,c_alphas,c_alphas_min,listRSS
+        return res,intercepts,listMask,c_coeff,l_coeff,Y,Y_l,Y_c,c_alphas,listRSS
     return res,intercepts
 
 def corrFlux(X,Y,beta,mask=None):
@@ -755,5 +879,6 @@ def corrFlux(X,Y,beta,mask=None):
     Y_t=np.dot(Y[:,~mask],np.linalg.pinv(beta_m))
     for i in xrange(X.shape[1]):
         a=np.dot(Y_t[:,i],X[:,i])/np.linalg.norm(X[:,i])**2
-        beta_c[i,~mask]=beta_c[i,~mask]*a
+        if a>1:
+            beta_c[i,~mask]=beta_c[i,~mask]*a
     return beta_c
