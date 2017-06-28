@@ -1,8 +1,13 @@
+.directory
+*~
 *.pyc
-.ipynb_checkpoints/
+*.so
 *.egg-info/
-_build
-_static
-_template
-
+*.eggs/
+.cache/
+.coverage*
+.tox/
+tags
+build/
+dist/
 
