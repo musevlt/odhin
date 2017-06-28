@@ -258,6 +258,7 @@ class Deblending():
         self.tmp_var = []
         self.listAlphas = []
         self.listRSS = []
+        self.listCorrFlux = []
         if store:
             self.listMask = []
             self.listccoeff = []
@@ -275,6 +276,7 @@ class Deblending():
         for j in xrange(len(self.listImagesHR)):
             self.listAlphas.append([])
             self.listRSS.append([])
+            self.listCorrFlux.append([])
             if store:
                 self.listMask.append([])
                 self.listccoeff.append([])
@@ -292,11 +294,9 @@ class Deblending():
 
             delta = int(self.cubeLR.shape[0]/float(self.nBands))
             for i in xrange(self.nBands):
-#                print i
-#                if i>0:
-#                    continue
                 self.listAlphas[j].append([])
                 self.listRSS[j].append([])
+                self.listCorrFlux[j].append([])
                 if store:
                     self.listMask[j].append([])
                     self.listccoeff[j].append([])
@@ -305,8 +305,6 @@ class Deblending():
                     self.listYc[j].append([])
                     self.listYl[j].append([])
                     self.spatialMask[j].append([])
-
-
 
 
                 #Create intensity maps at MUSE resolution
@@ -369,7 +367,7 @@ class Deblending():
 
                     Y_sig2=np.var(Y[~support,:],axis=0)
                     res = regulDeblendFunc(U_, Y, Y_c=Y_c,
-                                    ng=50, l_method='glasso_bic',
+                                    ng=200, l_method='glasso_bic',
                                     c_method='gridge_cv', corrflux=True,
                                     support=support, intercept=True,
                                     Y_sig2=Y_sig2,filt_w=filt_w,oneSig=True)
@@ -384,6 +382,7 @@ class Deblending():
                     #store all elements for checking purposes
                     self.listAlphas[j][i]=res[8]
                     self.listRSS[j][i]=res[9]
+                    self.listCorrFlux[j][i]=res[10]
                     if store:
                         self.spatialMask[j][i]=support
                         self.listMask[j][i]=res[2]

@@ -428,7 +428,7 @@ def oneSigRuleMain(alphas,rss):
     Parameters
     ----------
     alphas: list of regularization parameters
-    rss: array of prediction errors (shape : n_samples, n_targets, n_alphas)
+    rss: array of prediction errors (shape : n_samples, n_targets, n_alphas or n_targets, n_alphas)
 
     Returns
     -------
@@ -636,13 +636,12 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,50), intercept=True,
                 intercepts[:,k*ng:(k+1)*ng]=Ridge.intercept_.T
         elif method=='gcv_spe':
 
-            alpha,rss,beta=gridge_gcv_spectral(X_centr,Y_centr[:,k*ng:(k+1)*ng],alphas=alphas,Sig2=sig2[k*ng:(k+1)*ng],support=support,oneSig=oneSig)
+            alpha,rss=gridge_gcv_spectral(X_centr,Y_centr[:,k*ng:(k+1)*ng],alphas=alphas,Sig2=sig2[k*ng:(k+1)*ng],support=support,oneSig=oneSig)
             listAlpha[k*ng:(k+1)*ng]=alpha
             listRSS.append(rss.mean(axis=0).mean(axis=0))
             Ridge=sklm.Ridge(alpha=alpha,fit_intercept=intercept,normalize=True)
             Ridge.fit(X,Y[:,k*ng:(k+1)*ng])
             coeff[:,k*ng:(k+1)*ng]=Ridge.coef_.T
-            #coeff[:,k*ng:(k+1)*ng] = beta
             if intercept:
                 intercepts[:,k*ng:(k+1)*ng]=Ridge.intercept_.T
 
@@ -693,7 +692,7 @@ def gridge_gcv_spectral(X,Y,support,alphas=np.logspace(-5,2,50),
     Output:
     ------
         alpha : estimated regularization parameter
-        rss : errors of prediction (ndarray n_samples, n_targets,n_alphas)
+        rss : errors of prediction (ndarray n_targets,n_alphas)
     """
 
     Ys=Y[support]
@@ -703,31 +702,47 @@ def gridge_gcv_spectral(X,Y,support,alphas=np.logspace(-5,2,50),
     sumSig2=Sig2[:-2]+Sig2[2:]
     U,sval,V=np.linalg.svd(Xs,full_matrices=False)
     UtY=np.dot(U.T,Ys)
+    UtY2=UtY**2
     listInd=np.nonzero(support)[0]
 
-    rss=np.zeros((len(listInd),Y.shape[1],len(alphas)))
+    #rss=np.zeros((len(listInd),Y.shape[1],len(alphas)))
+    rss=np.zeros((Y.shape[1],len(alphas)))
     for a,alpha in enumerate(alphas):
-        S=(U * _diag_dot(sval**2/(sval**2+alpha),U.T).T).sum(-1) # get diag values of np.dot(Xs,np.dot(XtX,Xs.T))
-        Xbeta=np.dot(U,_diag_dot(sval**2/(sval**2+alpha),UtY))
         if cross_spectral==False:
-            rss[:,:,a]=((Ys-Xbeta)/(1-S)[:,None])**2
+            #S=(U * _diag_dot(sval**2/(sval**2+alpha),U.T).T).sum(-1) # get diag values of np.dot(Xs,np.dot(XtX,Xs.T))
+            #GCV approx S_ii =Tr(S)/n
+            TrS=np.sum(sval**2/(sval**2+alpha))
+            #Xbeta=np.dot(U,_diag_dot(sval**2/(sval**2+alpha),UtY))
+            residuals=np.sum(((alpha/(sval**2+alpha))**2)[:,None]*UtY2,axis=0)
+            #rss[:,:,a]=((Ys-Xbeta)/(1-S)[:,None])**2
+            #rss[:,:,a]=((Ys-Xbeta)/(1-TrS/Xs.shape[0]))**2
+            rss[:,a]=residuals/(1-TrS/Xs.shape[0])**2
         else:
-            res_left=((Ys[:,:-1]-Xbeta[:,1:])/(1-S)[:,None])**2
-            res_right=((Ys[:,1:]-Xbeta[:,:-1])/(1-S)[:,None])**2
+            TrS=np.sum(sval**2/(sval**2+alpha))
+            Xbeta=np.dot(U,_diag_dot(sval**2/(sval**2+alpha),UtY))
+            res_left=((Ys[:,:-1]-Xbeta[:,1:])/(1-TrS/Xs.shape[0]))**2
+            res_right=((Ys[:,1:]-Xbeta[:,:-1])/(1-TrS/Xs.shape[0]))**2
             rss[0,:,a]=res_right[:,0]
             rss[1:-1,:,a]=(res_left[:,:-1]*1*Sig2[2:]+res_right[:,1:]*Sig2[:-2])/sumSig2
             rss[-1,:,a]=res_left[:,-1]
 
     if oneSig:
-        alpha = oneSigRuleMain(alphas,rss)
+        alpha = alphas[np.argmin(np.average(rss,axis=0,weights=1/Sig2))]
+        TrS=np.sum(sval**2/(sval**2+alpha))
+        Xbeta=np.dot(U,_diag_dot(sval**2/(sval**2+alpha),UtY))
+        rss_alpha = ((Ys-Xbeta)/(1-TrS/Xs.shape[0]))**2
+        cv=rss_alpha.shape[0]*rss_alpha.shape[1]
+        min_mse_std = np.std(np.std(rss_alpha,axis=0),axis=0)/np.sqrt(cv)
+        min_mse=np.mean(np.mean(rss_alpha,axis=0),axis=0)
+        alpha=np.max([alphas[i] for i in xrange(len(alphas)) if np.mean(rss[:,i])<min_mse+min_mse_std])
+        #alpha = oneSigRuleMain(alphas,rss,std)
     else:
-        alpha = alphas[np.argmin(np.mean(np.average(rss,axis=1,weights=1/Sig2),axis=0))]
+        #alpha = alphas[np.argmin(np.mean(np.average(rss,axis=1,weights=1/Sig2),axis=0))]
+        alpha = alphas[np.argmin(np.average(rss,axis=0,weights=1/Sig2))]
     if alpha>np.max(sval)*maxAlphaFrac:
-        #print alpha,np.max(sval)
         alpha=np.max(sval)*maxAlphaFrac
-    #beta = np.dot(V.T,_diag_dot(sval/(sval**2+alpha),UtY))
-    beta=None
-    return alpha,rss,beta
+
+    return alpha,rss
 
 def _diag_dot( D, B):
     # compute dot(diag(D), B)
@@ -760,7 +775,7 @@ def medfilt (x, k):
     return np.median (y, axis=1)
 
 
-def regulDeblendFunc(X,Y,Y_c=None,l_method='glasso_bic',ng=1,c_method='RCV',g_method=None,cv_l=5,cv_c=None,
+def regulDeblendFunc(X,Y,Y_c=None,l_method='glasso_bic',ng=10,c_method='RCV',cv_l=5,cv_c=None,
     intercept=True,n_alphas=100,eps=1e-3,alpha_c=0.0001,oneSig=True,support=None,trueLines=None,
                   multivar=True,alphas=np.logspace(-5,2,50),recompute=True,filt_w=101,corrflux=True,Y_sig2=None):
     """
@@ -774,7 +789,14 @@ def regulDeblendFunc(X,Y,Y_c=None,l_method='glasso_bic',ng=1,c_method='RCV',g_me
             regressors (intensityMaps)
         Y : 2d array (n pixels  x lmbda wavelengths)
             data
-
+        Y_c : 2d array (n pixels  x lmbda wavelengths)
+            data continuum (if pre-estimated)
+        l_method : str
+            method to use for emission lines estimation
+        ng : int
+            size of spectral bin for regularization
+        c_method : str
+            method to use for continuum estimation (of objects spectra)
 
     Output:
     ------
@@ -855,30 +877,67 @@ def regulDeblendFunc(X,Y,Y_c=None,l_method='glasso_bic',ng=1,c_method='RCV',g_me
                 oneSig=oneSig,alphas=alphas)
 
     # correct flux
+    # add one row of ones for background/intercept to keep corresponding
+    # positions in result arrays
+    listA=np.ones((X.shape[1]+1,Y.shape[1]))
+
     if corrflux==True:
-        c_coeff=corrFlux(X,Y_c,c_coeff)
+#        for k in xrange(int(np.ceil(Y_c.shape[1]/float(ng)))):
+#            r=corrFlux(X,Y_c[:,k*ng:(k+1)*ng],c_coeff[:,k*ng:(k+1)*ng])
+#            c_coeff[:,k*ng:(k+1)*ng] = r[0]
+#            listA[1:,k*ng:(k+1)*ng] = r[1][:,None]
+#   compute on whole block
+         r=corrFlux(X,Y_c,c_coeff)
+         c_coeff = r[0]
+         listA[1:,:] = r[1][:,None]
 
     # combine coeffs from lines and continuum
     res = c_coeff + l_coeff
     intercepts=c_intercepts + l_intercepts
 
     if c_method == 'gridge_cv':
-        return res,intercepts,listMask,c_coeff,l_coeff,Y,Y_l,Y_c,c_alphas,listRSS
+        return res,intercepts,listMask,c_coeff,l_coeff,Y,Y_l,Y_c,c_alphas,listRSS,listA
     return res,intercepts
 
-def corrFlux(X,Y,beta,mask=None):
+def corrFlux(X,Y,beta):
     """
     Correct coefficients to limit flux loss
-    We seek a diagonal matrix A to minimize ||Y-X*A*beta||^2
-    """
-    if (type(mask)==np.bool_) or (mask is None):
-        mask=np.zeros(Y.shape[1]).astype(bool)
+    We seek a diagonal matrix A to minimize ||Y-X*A*beta||^2 with A_ii>=1
+    (as we know there has been some flux loss)
 
+    Parameters
+    ----------
+    X : 2d array (n pixels  x  k objects)
+            regressors (intensityMaps)
+    Y : 2d array (n pixels  x lambda wavelengths)
+            data
+    beta : 2d array (k objects x lambda wavelengths)
+        spectra
+
+    Output
+    ------
+    beta_c : 2d array (k objects x lambda wavelengths)
+        corrected spectra
+    listA : 1d array (k objects)
+        correction factors
+    """
+    niter=5
     beta_c=beta.copy()
-    beta_m=beta[:,~mask]
-    Y_t=np.dot(Y[:,~mask],np.linalg.pinv(beta_m))
-    for i in xrange(X.shape[1]):
-        a=np.dot(Y_t[:,i],X[:,i])/np.linalg.norm(X[:,i])**2
-        if a>1:
-            beta_c[i,~mask]=beta_c[i,~mask]*a
-    return beta_c
+    listA=np.ones(X.shape[1])
+    listI=np.zeros(X.shape[1]).astype(bool)
+    k=0
+    while (False in listI) and k<niter: #iter until no coeff is under one.
+        if k==0:
+            listI[:]=True
+        Y_t=np.dot(Y,np.linalg.pinv(beta[listI,:]))
+        for j,i in enumerate(np.arange(X.shape[1])[listI]):
+            a=np.dot(Y_t[:,j],X[:,i])/np.linalg.norm(X[:,i])**2
+            if a<1:
+                listI[i]=False
+                listA[i]=1
+            else:
+                listA[i]=a
+        k=k+1
+    for i,a in enumerate(listA):
+        beta_c[i,:]=beta_c[i,:]*a
+    return beta_c,listA
