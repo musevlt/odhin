@@ -800,6 +800,8 @@ def regulDeblendFunc(X,Y,Y_c=None,l_method='glasso_bic',ng=10,c_method='RCV',cv_
         estimation of continuum of objects spectra
     l_coeff: 2d array (k objects x lambda wavelengths)
         estimation of lines of objects spectra
+    Y: 2d array (n pixels  x lmbda wavelengths)
+        data
     Y_l: 2d array (n pixels  x lmbda wavelengths)
         data lines
     Y_c: 2d array (n pixels  x lmbda wavelengths)
@@ -898,7 +900,7 @@ def regulDeblendFunc(X,Y,Y_c=None,l_method='glasso_bic',ng=10,c_method='RCV',cv_
     intercepts=c_intercepts + l_intercepts
 
     if c_method == 'gridge_cv':
-        return res,intercepts,listMask,c_coeff,l_coeff,Y_l,Y_c,c_alphas,listRSS,listA
+        return res,intercepts,listMask,c_coeff,l_coeff,Y,Y_l,Y_c,c_alphas,listRSS,listA
     return res,intercepts
 
 def corrFlux(X,Y,beta):
