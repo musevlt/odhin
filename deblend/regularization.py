@@ -217,24 +217,27 @@ def getLinesSupportList(listSpe,w=10,wmin=1,wmax=20,alpha=1.4,beta=1.2,
     w: int
         minimal width
     wmin : int
-        min
+        minimal half-width
     wmax : int
-        min
+        maximal half-width of line
     alpha : float
-
+        threshold for matched filter data: keep only extrema that are above
+        alpha*sig_filt (standard deviation of matched filtered spectrum)
     beta : float
-
+        Stop line spectral support where signal is lower than beta*sig.
     n_sig: float
-        A half-width corresponds to n_sig standard deviations.
+        A half-width corresponds to n_sig standard deviations of the kernel.
 
     f: float
-
+        to avoid too many overlapping masks : if already covered at more than a fraction f by an existing
+        mask don't add current mask
     returnAll : bool
         return all intermediate results
     filt: 1d-array (None by default)
-
+        pattern for matching filter (gaussian shape will be made by default)
     localConstraint : bool
-
+        if True, reject peaks where immediate neighbors of extrema are not > 1 std
+        (maxima) or < -1 std (minima).
 
 
     Output:
@@ -263,15 +266,20 @@ def getLinesSupportList(listSpe,w=10,wmin=1,wmax=20,alpha=1.4,beta=1.2,
         listArgExtrema = np.nonzero(np.abs(spe_filt)>B)[0]
         listExtrema = spe_filt[listArgExtrema]
 
-
+        # generate kernels for estimation of line width
         listKernel=genKernels(listWidth=np.concatenate([np.array([0.1]),
                                                         np.arange(1,2*wmax+2,2)]),n=2*wmax+1,n_sig=n_sig)
+
+        #compute number of kept extrema after thresholding
         nThresh=np.sum(np.abs(spe_filt[listArgExtrema])>alpha*sig_filt)
+
         for k,m in zip(listArgExtrema,listExtrema):
             if (np.abs(spe_filt[k])>alpha*sig_filt) and (
                     (localConstraint==False) or (spe[np.maximum(k-1,0):k+2]>np.sign(spe[k])*sig).all()):
                 mask=np.zeros_like(spe).astype(bool)
                 kmin=np.maximum(k-wmax,0)
+
+                # create sub spectrum of good size for width estimation
                 if k-wmax<0:
                     line=np.concatenate([np.zeros(wmax-k),spe[kmin:k+wmax+1]])
                 elif wmax+k+1>len(spe):
@@ -279,11 +287,13 @@ def getLinesSupportList(listSpe,w=10,wmin=1,wmax=20,alpha=1.4,beta=1.2,
                 else:
                     line=spe[kmin:k+wmax+1]
 
+                # width line estimation
                 line=line/np.linalg.norm(line)
                 width=calcWidth(line,listKernel=listKernel,n_sig=n_sig,
                                 listWidth=np.concatenate([np.array([0.1]),np.arange(1,2*wmax+2,2)]))
                 width=int(width)
 
+                # keep only peaks larger than minimal width
                 if width>=2*wmin+1:
                     if len(np.nonzero(spe[np.maximum(k-width,0):k]<beta*sig)[0])>0:
                         a=np.maximum(k-width,1)+np.nonzero(spe[np.maximum(k-width,0):k]<beta*sig)[0][-1]-1
@@ -297,10 +307,11 @@ def getLinesSupportList(listSpe,w=10,wmin=1,wmax=20,alpha=1.4,beta=1.2,
                     lRejected+=1
                     continue
 
+                # if already covered at more than a fraction f by an existing
+                # mask don't add current mask
                 if np.any([np.sum(x[a:b])>(b-a)*f for x in listMask]):
-                    # if already covered at more than a fraction f by an existing
-                    # mask don't add current mask
                     continue
+
                 mask[a:b]=True
                 listMask.append(mask)
     if returnAll==True:
@@ -779,7 +790,26 @@ def regulDeblendFunc(X,Y,Y_c=None,l_method='glasso_bic',ng=10,c_method='RCV',cv_
 
     Output:
     ------
-    res,intercepts,listMask,c_coeff,l_coeff,Y,Y_l,Y_c,c_alphas,listRSS,listA
+    res: 2d array (k objects lambda wavelengths)
+        estimation of objects spectra
+    intercepts:
+        estimation backroung spectrum
+    listMask :
+        list of masks of detected lines
+    c_coeff: 2d array (k objects x lambda wavelengths)
+        estimation of continuum of objects spectra
+    l_coeff: 2d array (k objects x lambda wavelengths)
+        estimation of lines of objects spectra
+    Y_l: 2d array (n pixels  x lmbda wavelengths)
+        data lines
+    Y_c: 2d array (n pixels  x lmbda wavelengths)
+        data remaining continuum after lines estimation
+    c_alphas:
+        array of regularization parameters
+    listRSS:
+        array of prediction errors
+    listA : 2d array (k objects x lambda wavelengths)
+         array of flux correction factors
     """
     #get emission lines only (Y_l)
     if Y_c is None:
@@ -868,7 +898,7 @@ def regulDeblendFunc(X,Y,Y_c=None,l_method='glasso_bic',ng=10,c_method='RCV',cv_
     intercepts=c_intercepts + l_intercepts
 
     if c_method == 'gridge_cv':
-        return res,intercepts,listMask,c_coeff,l_coeff,Y,Y_l,Y_c,c_alphas,listRSS,listA
+        return res,intercepts,listMask,c_coeff,l_coeff,Y_l,Y_c,c_alphas,listRSS,listA
     return res,intercepts
 
 def corrFlux(X,Y,beta):
