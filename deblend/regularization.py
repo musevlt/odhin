@@ -608,7 +608,7 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,50),
 
     coeff=np.zeros((X.shape[1],Y.shape[1]))
     intercepts=np.zeros((1,Y.shape[1]))
-    RCV_slid=sklm.RidgeCV(alphas=alphas,fit_intercept=intercept,normalize=True,
+    RCV_slid=sklm.RidgeCV(alphas=alphas,fit_intercept=True,normalize=True,
                           store_cv_values=True)
     listAlpha=np.zeros((Y.shape[1]))
     listRSS=[]

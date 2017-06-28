@@ -369,7 +369,7 @@ class Deblending():
                     res = regulDeblendFunc(U_, Y, Y_c=Y_c,
                                     ng=200, l_method='glasso_bic',
                                     c_method='gridge_cv', corrflux=True,
-                                    support=support, intercept=True,
+                                    support=support,
                                     Y_sig2=Y_sig2,filt_w=filt_w,oneSig=True)
 
 
