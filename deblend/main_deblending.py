@@ -4,20 +4,12 @@ Created on Sun Jan 17 16:31:40 2016
 
 @author: raphael.bacher@gipsa-lab.fr
 """
-import mpdaf
-
 
 
 from mpdaf.obj import Cube,Image,Spectrum
 import scipy.signal as ssl
 import scipy.sparse.linalg as sla
 import numpy as np
-try:
-    from skimage.measure import label
-    from skimage.morphology import closing, square
-    from skimage.measure import regionprops
-except:
-    pass
 from scipy.interpolate import interp1d
 import scipy.optimize as so
 import os
@@ -500,29 +492,17 @@ class Deblending():
         self.tmp_sourcesCont = [ssl.medfilt(tmp_source, kernel_size=(1, w)) for tmp_source in self.tmp_sources]
         self.cubeRebuiltCont = self._rebuildCube(self.tmp_sourcesCont)
 
-    def _getLabel(self, image=None, thresh=None, segmap=None):
+    def _getLabel(self, segmap=None):
         """
-        If no segmentation map create one by thresholding image (ndarray) by thres (float).
-        If given segmap, create a new segmap with contiguous indices
+        Create a new segmap with contiguous indices
         """
-        if segmap is None:  # apply threshold
-            bw = closing(image > thresh, square(2))
-            label_image = label(bw)
-            for region in regionprops(label_image):
-                # skip small regions
-                if region.area < 3:
-                    label_image[label_image == region.label] = 0
-
-        else:  # exploit HST segmap
-
-            label_image = np.zeros(segmap.shape, dtype='int')
-            i = 0
-            for k in sorted(set(segmap.flatten())):
-                label_image[segmap == k] = i
-                i = i+1
+        label_image = np.zeros(segmap.shape, dtype='int')
+        i = 0
+        for k in sorted(set(segmap.flatten())):
+            label_image[segmap == k] = i
+            i = i+1
 
         return label_image
-
 
 
     def _getHST_ID(self):
