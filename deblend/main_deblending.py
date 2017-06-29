@@ -141,9 +141,6 @@ class Deblending():
         else:
             self.filtResp = [np.ones(self.cubeLR.shape[0])]*4
 
-        # needeed for muse_analysis
-        for k, im in enumerate(self.listImagesHR):
-            im.primary_header['FILTER'] = ['f606w', 'f775w', 'f814w', 'f850lp'][k]
 
         self.shapeHR = self.listImagesHR[0].shape
         self.shapeLR = self.cubeLR[0].shape
@@ -184,9 +181,8 @@ class Deblending():
             mask = np.zeros(self.listImagesHR[0].shape)
 
             #put intensityMap of background in first position (estimated spectrum of background will also be first)
-            mask[:] = 1.
-            intensityMapHR[0] = mask.copy().flatten()
-            mask[:] = 0
+            intensityMapHR[0] = 1.
+
 
             for k in xrange(1,np.max(self.labelHR)+1):
                 mask[self.labelHR == k] = np.maximum(self.listImagesHR[j].data[self.labelHR==k],10**(-9))#avoid negative abundances
