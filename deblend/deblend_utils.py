@@ -13,7 +13,6 @@ from scipy.interpolate import interp1d
 import astropy.units as units
 import astropy.io.fits as pyfits
 import math
-from muse_analysis.imphot import fit_image_photometry, rescale_hst_like_muse
 from scipy import ndimage
 
 import matplotlib.pyplot as plt
@@ -250,3 +249,134 @@ def regrid_hst_like_muse(hst, muse, inplace=True, antialias=True):
     # image.
 
     return hst.align_with_image(muse, cutoff=0.0, flux=True, inplace=True,antialias=antialias)
+
+class HstFilterInfo(object):
+    """An object that contains the filter characteristics of an HST
+    image.
+
+    Parameters
+    ----------
+    hst : `mpdaf.obj.Image` or str
+       The HST image to be characterized, or the name of an HST filter,
+       such as "F606W.
+
+    Attributes
+    ----------
+    filter_name : str
+       The name of the filter.
+    abmag_zero : float
+       The AB magnitude that corresponds to the zero electrons/s\n
+       from the camera (see ``https://archive.stsci.edu/prepds/xdf``).
+    photflam : float
+       The calibration factor to convert pixel values in\n
+       electrons/s to erg cm-2 s-1 Angstrom-1.\n
+       Calculated using::
+
+         photflam = 10**(-abmag_zero/2.5 - 2*log10(photplam) - 0.9632)
+
+       which is a rearranged form of the following equation from\n
+       ``http://www.stsci.edu/hst/acs/analysis/zeropoints``::
+
+         abmag_zero = -2.5 log10(photflam)-5 log10(photplam)-2.408
+
+    photplam : float
+       The pivot wavelength of the filter (Angstrom)\n
+       (from ``http://www.stsci.edu/hst/acs/analysis/bandwidths``)
+    photbw : float
+       The effective bandwidth of the filter (Angstrom)\n
+       (from ``http://www.stsci.edu/hst/acs/analysis/bandwidths``)
+
+    """
+
+    # Create a class-level dictionary of HST filter characteristics.
+    # See the documentation of the attributes for the source of these
+    # numbers.
+
+    _filters = {
+        "F606W" :  {"abmag_zero" : 26.51,    "photplam"  : 5921.1,
+                    "photflam"   : 7.73e-20, "photbw"    : 672.3},
+        "F775W" :  {"abmag_zero" : 25.69,    "photplam"  : 7692.4,
+                    "photflam"   : 9.74e-20, "photbw"    : 434.4},
+        "F814W" :  {"abmag_zero" : 25.94,    "photplam"  : 8057.0,
+                    "photflam"   : 7.05e-20, "photbw"    : 652.0},
+        "F850LP" : {"abmag_zero" : 24.87,    "photplam"  : 9033.1,
+                    "photflam"   : 1.50e-19, "photbw"    : 525.7}
+    }
+
+    def __init__(self, hst):
+
+        # If an image has been given, get the name of the HST filter
+        # from the FITS header of the HST image, and convert the name
+        # to upper case. Otherwise get it from the specified filter
+        # name.
+
+        if isinstance(hst, str):
+            self.filter_name = hst.upper()
+        elif "FILTER" in hst.primary_header:
+            self.filter_name = hst.primary_header['FILTER'].upper()
+        elif ("FILTER1" in hst.primary_header and
+              hst.primary_header['FILTER1'] != 'CLEAR1L'):
+            self.filter_name = hst.primary_header['FILTER1'].upper()
+        elif ("FILTER2" in hst.primary_header and
+              hst.primary_header['FILTER2'] != 'CLEAR2L'):
+            self.filter_name = hst.primary_header['FILTER2'].upper()
+
+
+        # Get the dictionary of the characteristics of the filter.
+
+        if self.filter_name in self.__class__._filters:
+            info = self.__class__._filters[self.filter_name]
+
+
+        # Record the characteristics of the filer.
+
+        self.abmag_zero = info['abmag_zero']
+        self.photflam = info['photflam']
+        self.photplam = info['photplam']
+        self.photbw = info['photbw']
+
+def rescale_hst_like_muse(hst, muse, inplace=True):
+    """Rescale an HST image to have the same flux units as a given MUSE image.
+
+    Parameters
+    ----------
+    hst : `mpdaf.obj.Image`
+       The HST image to be resampled.
+    muse : `mpdaf.obj.Image` or `mpdaf.obj.Cube`
+       A MUSE image or cube with the target flux units.
+    inplace : bool
+       (This defaults to True, because HST images tend to be large)
+       If True, replace the contents of the input HST image object
+       with the rescaled image.
+       If False, return a new Image object that contains the rescaled
+       image.
+
+    Returns
+    -------
+    out : `mpdaf.obj.Image`
+       The rescaled HST image.
+
+    """
+
+    # Operate on a copy of the input image?
+
+    if not inplace:
+        hst = hst.copy()
+
+    # Get the characteristics of the HST filter.
+
+    filt = HstFilterInfo(hst)
+
+    # Calculate the calibration factor needed to convert from
+    # electrons/s in the HST image to MUSE flux-density units.
+
+    cal = filt.photflam * units.Unit("erg cm-2 s-1 Angstrom-1").to(muse.unit)
+
+    # Rescale the HST image to have the same units as the MUSE image.
+
+    hst.data *= cal
+    if hst.var is not None:
+        hst.var *= cal**2
+    hst.unit = muse.unit
+
+    return hst
