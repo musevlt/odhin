@@ -17,7 +17,7 @@ import astropy.units as units
 import astropy.io.fits as pyfits
 from regularization import regulDeblendFunc,medfilt
 from deblend_utils import convertFilt, calcFSF, apply_resampling_window, normalize,\
-                        getSpatialShift, generateMoffatIm,\
+                         generateMoffatIm,\
                         convertIntensityMap, getMainSupport, generatePSF_HST
 
 
