@@ -6,7 +6,6 @@ import scipy.signal as ssl
 import scipy.stats as sst
 import itertools
 import sklearn.linear_model as sklm
-import sklearn.model_selection as skms
 from scipy.ndimage.morphology import binary_dilation,grey_dilation
 
 
@@ -379,29 +378,6 @@ def calcWidth(spe,listKernel=None,n_sig=1,listWidth=np.arange(5,42,2)):
     res=listWidth[np.argmax(np.abs(listCorr))]
     return res
 
-def oneSigRule(LRCV):
-    """
-    Get regularization parameter using 1-sig rule
-
-    Parameters
-    ----------
-    LRCV: sklearn.LinearModel.MultiTaskLassoCV
-
-    Returns
-    -------
-    alpha: regularisation parameter
-
-
-    """
-    ind=np.argmin(np.mean(LRCV.mse_path_,axis=1))
-    min_mse=np.mean(LRCV.mse_path_,axis=1)[ind]
-    if type(LRCV.cv)==int:
-        cv=LRCV.cv
-    elif type(LRCV.cv)==skms._split.KFold:
-        cv=LRCV.cv.n_splits
-    min_mse_std=np.std(LRCV.mse_path_,axis=1)[ind]/np.sqrt(cv)
-    alpha=np.max([LRCV.alphas_[i] for i in xrange(len(LRCV.alphas_)) if np.mean(LRCV.mse_path_[i])<min_mse+min_mse_std])
-    return alpha
 
 def oneSigRuleRidge(LRCV):
     """
@@ -447,82 +423,6 @@ def oneSigRuleMain(alphas,rss):
     alpha=np.max([alphas[i] for i in xrange(len(alphas)) if np.mean(rss[:,:,i])<min_mse+min_mse_std])
     return alpha
 
-
-
-def glasso_cv(X,Y,ng=9,cv=10,alphas=np.logspace(-5,2,50),recompute=True,oneSig=True,
-              listMask=None,returnAlpha=False):
-    """
-
-    Estimate spectra from X, Y using group lasso and cross validation.
-    If given listMask, on each mask do
-        coeff = argmin ||Y - XB||^Fro_2 + alpha * ||B||_21
-        alpha is estimated by cross validation and ||B||_{1,2} is the mixed norm
-        ||B||_21 = \sum_i \sqrt{\sum_j b_{ij}^2}
-
-    Parameters
-    ----------
-        X : regressors (intensityMaps, n x k)
-        Y : data (n x lmbda)
-        ng : size of spectral blocks
-        cv : number of K-folds for cross validation
-        alphas : list of regul parameters to test
-        recompute : if True, estimate again coefficients (spectra) without penalty
-                    but using only selected regressors (avoid bias on estimated coeff)
-        oneSig : if True, use the 'one sigma' rule to increase regularization efficiency
-        listMask : list of lines mask. The regularization is done independently on each of these masks
-        returnAlpha : if True return list of estimated regularization parameters
-
-    Output:
-    ------
-        coeff : estimated coefficients (spectra k x lmbda)
-        intercepts : background (1 x lmbda)
-
-    """
-    coeff=np.zeros((X.shape[1],Y.shape[1]))
-    intercepts=np.zeros((1,Y.shape[1]))
-    alphas_ = []
-    kf=skms.KFold(n_splits=cv,shuffle=True)
-    LAMTCV_slid=sklm.MultiTaskLassoCV(alphas=alphas,n_jobs=1,cv=kf,fit_intercept=True)
-    if listMask is not None:
-        for mask in listMask:
-            LAMTCV_slid.fit(X,Y[:,mask])
-            if oneSig == True:
-                alpha=oneSigRule(LAMTCV_slid)
-                LAMT_slid=sklm.MultiTaskLasso(alpha=alpha,fit_intercept=True)
-                LAMT_slid.fit(X,Y[:,mask])
-                coeff[:,mask]=LAMT_slid.coef_.T
-                intercepts[:,mask]=LAMT_slid.intercept_.T
-                alphas_.append(alpha)
-            else:
-                coeff[:,mask]=LAMTCV_slid.coef_.T
-                intercepts[:,mask]=LAMTCV_slid.intercept_.T
-                alphas_.append(LAMTCV_slid.alpha_)
-    else:
-        for k in xrange(Y.shape[1]):
-            LAMTCV_slid.fit(X,Y[:,np.maximum(k-ng,0):k+1+ng])
-            if oneSig == True:
-                alpha=oneSigRule(LAMTCV_slid)
-                LAMT_slid=sklm.MultiTaskLasso(alpha=alpha)
-                LAMT_slid.fit(X,Y[:,np.maximum(k-ng,0):k+1+ng])
-                coeff[:,k]=LAMT_slid.coef_.T[:,np.minimum(ng,k)]
-                intercepts[:,k]=LAMT_slid.intercept_.T[np.minimum(ng,k)]
-                alphas_.append(alpha)
-            else:
-                coeff[:,k]=LAMTCV_slid.coef_.T[:,np.minimum(ng,k)]
-                intercepts[:,k]=LAMTCV_slid.intercept_.T[np.minimum(ng,k)]
-                alphas_.append(LAMTCV_slid.alpha_)
-
-    if recompute: #to avoid bias in the estimated spectra, recompute solutions using only the selected objects
-        LR_sup = sklm.LinearRegression(fit_intercept=True)
-        coeff2=np.zeros_like(coeff)
-        for k in xrange(coeff.shape[1]):
-            LR_sup.fit(np.dot(X,np.diag((coeff!=0)[:,k])),Y[:,k])
-            coeff2[:,k]=LR_sup.coef_.T
-            intercepts[:,k]=LR_sup.intercept_.T
-        coeff=coeff2
-    if returnAlpha == True:
-        return coeff, intercepts, alphas_
-    return coeff,intercepts
 
 
 def gridge_bic(X,Y,alphas=np.logspace(-5,2,50),multivar=False,

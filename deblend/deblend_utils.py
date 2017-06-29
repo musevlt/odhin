@@ -142,39 +142,10 @@ def normalize(a, axis=-1, order=2, returnCoeff=False):
         return a / np.expand_dims(l2, axis)
 
 
-def getSpatialShift(imMUSE_0, imHST_0, beta_muse, fwhm_muse,):
-    """
-    Parameters
-    ----------
-
-    imMUSE_0 : `mpdaf.obj.Image`
-        The MUSE image or cube against which the HST image must be aligned.
-    imHST_0 : `mpdaf.obj.Image`
-          The HST image to be shifted.
-    fwhm_muse : `float`
-        fwhm of MUSE FSF
-    beta_muse : `float`
-        Moffat beta parameter of MUSE FSF
 
 
 
-    Returns
-    -------
-    shift : `(float,float)`
-       Shift in (x,y) to apply to HST image
-
-    """
-    imHST_1 = imHST_0.copy()
-    regrid_hst_like_muse(imHST_1, imMUSE_0, inplace=True)
-    rescale_hst_like_muse(imHST_1, imMUSE_0, inplace=True)
-    res = fit_image_photometry(imHST_1, imMUSE_0, fix_beta=beta_muse,
-                               fix_fwhm=fwhm_muse, fix_dx=None, fix_dy=None, display=False)[0]
-
-    return (res.dx.value, res.dy.value)
-
-
-
-def convertIntensityMap(intensityMap,muse,hst,fwhm,beta,shift,antialias=False,psf_hst=True):
+def convertIntensityMap(intensityMap,muse,hst,fwhm,beta,antialias=False,psf_hst=True):
     """
     Parameters
     ----------
@@ -189,8 +160,6 @@ def convertIntensityMap(intensityMap,muse,hst,fwhm,beta,shift,antialias=False,ps
         fwhm of MUSE FSF
     beta : `float`
         Moffat beta parameter of MUSE FSF
-    shift : `(float,float)`
-        Shifts to apply to HST image
     antialias : `bool`
         Use antialising filter or not.
         Default to False (because a broad convolution is applied afterwards)

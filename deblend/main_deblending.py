@@ -150,27 +150,7 @@ class Deblending():
         self.residuals = np.zeros((self.cubeLR.shape[0], self.cubeLR.shape[1]*self.cubeLR.shape[2]))
         self.cubeRebuilt = np.zeros((self.cubeLR.shape[0], self.cubeLR.shape[1]*self.cubeLR.shape[2]))
         self.PSF_HST = generatePSF_HST(alphaHST, betaHST)
-        self.listShift = [[0, 0] for k in xrange(len(self.listImagesHR))]
 
-
-
-    def corrAlign(self, PSF_HST=None,):
-        """
-        Align HST and MUSE images for each HST filter.
-        Optional. If used to be called before calling findSources()
-        """
-        self.listImagesLR = []
-        for filt in xrange(len(self.filtResp)):
-
-            # build muse image based on the spectral response filter
-            imMUSE = (self.src.cubes['MUSE_CUBE']*self.filtResp[filt][:, np.newaxis, np.newaxis]).sum(axis=0)
-            self.listImagesLR.append(imMUSE)
-
-            #build muse average FSF for the filter spectral band
-            fwhm_muse=self.fsf_a+self.fsf_b*[6060, 7750, 8140, 8500][filt]
-            imHST = self.listImagesHR[filt]
-            # get spatial shift (dx,dy)
-            self.listShift[filt] = getSpatialShift(imMUSE, imHST, self.betaFSF, fwhm_muse, PSF_HST)
 
     def createIntensityMap(self, segmap=None, thresh=None):
         """
@@ -302,7 +282,7 @@ class Deblending():
                 #Create intensity maps at MUSE resolution
                 intensityMapLRConvol = convertIntensityMap(self.listIntensityMapHR[j],
                     self.src.cubes['MUSE_CUBE'][0,:,:], self.listImagesHR[j],
-                    self.listFWHM[i], self.betaFSF, self.listShift[j],
+                    self.listFWHM[i], self.betaFSF,
                     antialias=antialias,psf_hst=transfert_hst)
 
                 ## truncate intensity maps support after convolution
