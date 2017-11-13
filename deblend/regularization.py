@@ -204,7 +204,7 @@ def mad(arr):
     med = np.median(arr)
     return np.median(np.abs(arr - med))
 
-def getLinesSupportList(listSpe,w=10,wmin=1,wmax=20,alpha=1.4,beta=1.2,
+def getLinesSupportList(listSpe,w=2,wmin=1,wmax=20,alpha=1.4,beta=1.2,
                        n_sig=1.2,f=0.6,returnAll=False,filt=None,localConstraint=True):
     """
     Get emission/absorption lines spectral support
@@ -214,7 +214,7 @@ def getLinesSupportList(listSpe,w=10,wmin=1,wmax=20,alpha=1.4,beta=1.2,
     listSpe : list of 1d arrays (spectra of size lambda)
         list of spectra where to seek lines
     w: int
-        minimal width
+        minimal width for local extrema research
     wmin : int
         minimal half-width
     wmax : int
