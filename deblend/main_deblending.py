@@ -418,7 +418,7 @@ class Deblending():
             pyfits.writeto(tmp_dir+'wider.fits',im,overwrite=True)
             pyfits.writeto(tmp_dir+'sharper.fits',psf_hst,overwrite=True)
             os.system('export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH')
-            os.system('astconvolve --kernel=%ssharper.fits --makekernel=%s %swider.fits --output=%skernel_%s.fits'%(tmp_dir,np.maximum(im.shape[0],im.shape[1])/2-1,tmp_dir,tmp_dir,fwhm))
+            os.system('astconvolve -h 0 -u 0 --kernel=%ssharper.fits --makekernel=%s %swider.fits --output=%skernel_%s.fits'%(tmp_dir,np.maximum(im.shape[0],im.shape[1])/2-1,tmp_dir,tmp_dir,fwhm))
 
 
 

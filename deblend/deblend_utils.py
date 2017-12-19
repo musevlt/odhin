@@ -178,7 +178,7 @@ def convertIntensityMap(intensityMap,muse,hst,fwhm,beta,antialias=False,psf_hst=
 
     if psf_hst == True: #get HST-MUSE transfert function
         tmp_dir='./tmp/'
-        imPSFMUSE = pyfits.open(tmp_dir+'kernel_%s.fits'%fwhm)[0].data
+        imPSFMUSE = pyfits.open(tmp_dir+'kernel_%s.fits'%fwhm)[1].data
         imPSFMUSE=imPSFMUSE/np.sum(imPSFMUSE)
     else:
         alpha= fwhm / 2.0 / np.sqrt((2.0**(1.0 / beta) - 1.0))
