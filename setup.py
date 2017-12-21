@@ -8,7 +8,7 @@ setup(
     packages=find_packages(),
     zip_safe=False,
     package_data={
-        'deblend': ['deblend/*.dat'],                                               
+        'deblend': ['data/*.dat'],                                               
     },
     include_package_data=True,
 ) 
