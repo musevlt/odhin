@@ -1,0 +1,12 @@
+channels:
+  - conda-forge
+  - defaults
+  - openastronomy
+dependencies:
+  - matplotlib
+  - scikit-learn
+  - scipy
+  - numpy
+  - astropy
+  - pip:
+    - mpdaf
