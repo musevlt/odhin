@@ -1,6 +1,7 @@
 #!/bin/bash
-cd TOPGNUASTRO
-tar xf gnuastro-latest.tar.gz   
+
+wget http://ftp.gnu.org/gnu/gnuastro/gnuastro-0.4.tar.gz
+tar xf gnuastro-0.4.tar.gz   
 cd gnuastro-0.4                  
 ./configure
 make -j8           
