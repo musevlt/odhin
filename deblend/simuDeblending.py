@@ -5,11 +5,15 @@ Created on Sun Jan 17 14:04:39 2016
 @author: raphael
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import numpy as np
 import scipy.signal as ssl
 from scipy.stats import multivariate_normal
-from downsampling import downsampling
-from deblend_utils import generateMoffatIm
+from .downsampling import downsampling
+from .deblend_utils import generateMoffatIm
 import os
 import astropy.io.fits as pyfits
 
@@ -53,7 +57,7 @@ class SimuDeblending:
         a_hst = np.sqrt(self.fwhm_hst**2 / 4.0 / (2.0**(1.0 / self.betaHST) - 1.0))
         self.PSFHST = generateMoffatIm(shape=(101, 101), center=(50, 50), alpha=a_hst, beta=self.betaHST,dim='HST')
         self.ImHR2=ssl.fftconvolve(self.ImHR2,self.PSFHST,mode='same')
-        for k in xrange(self.nbS):
+        for k in range(self.nbS):
             self.mapAbundances[k]=ssl.fftconvolve(self.mapAbundances[k].reshape(self.shapeHR), self.PSFHST,mode='same').flatten()
         self._generateHSTMUSE_transfert_PSF()
         tmp_dir='./tmp/'
@@ -67,7 +71,7 @@ class SimuDeblending:
         self.mapAbundancesConvol = np.zeros((self.nbS, self.shapeHR[0]*self.shapeHR[1]))
         self.mapAbundancesLRConvol = np.zeros((self.nbS, self.shapeLR[0]*self.shapeLR[1]))
 
-        for k in xrange(self.nbS):
+        for k in range(self.nbS):
             self.mapAbundancesConvol[k]=ssl.fftconvolve(self.mapAbundances[k].reshape(self.shapeHR), imTransfertHSTMUSE, mode='same').flatten()
             self.mapAbundancesLRConvol[k]=downsampling(self.mapAbundancesConvol[k].reshape(self.shapeHR), self.shapeLR).flatten()
 
@@ -84,7 +88,7 @@ class SimuDeblending:
             self.CubeLR = np.dot(self.mapAbundancesLRConvol.T,self.DicSources.T).T.reshape(self.LBDA,self.shapeLR[0],self.shapeLR[1])
 
         #convolve by HST PSF (after construction of the cubeLR to simulated the presence of two unrelated PSF one for HST, one for MUSE)
-        #for k in xrange(self.nbS):
+        #for k in range(self.nbS):
         #    self.mapAbundances[k]=ssl.fftconvolve(self.mapAbundances[k].reshape(self.shapeHR), self.PSFHST,mode='same').flatten()
 
     def _generateHSTMUSE_transfert_PSF(self):
@@ -98,8 +102,8 @@ class SimuDeblending:
         shape = np.asarray(hst.shape).astype(int)
 
         # get odd shape
-        shape_1 = shape/2 *2 +1
-        center=shape_1/2
+        shape_1 = shape//2 *2 +1
+        center=shape_1//2
         # Extract the dimensions of the expanded Y and X axes.
         ind = np.indices(shape_1)
         rsq=((ind[0]-center[0])*dx)**2 + (((ind[1]-center[1]))*dy)**2
@@ -120,7 +124,7 @@ class SimuDeblending:
         pyfits.writeto(tmp_dir+'wider.fits',im,overwrite=True)
         pyfits.writeto(tmp_dir+'sharper.fits',psf_hst,overwrite=True)
         os.system('export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH')
-        os.system('astconvolve --kernel=%ssharper.fits --makekernel=%s %swider.fits --output=%skernel_simu.fits'%(tmp_dir,np.maximum(im.shape[0],im.shape[1])/2-1,tmp_dir,tmp_dir))
+        os.system('astconvolve --kernel=%ssharper.fits --makekernel=%s %swider.fits --output=%skernel_simu.fits'%(tmp_dir,np.maximum(im.shape[0],im.shape[1])//2-1,tmp_dir,tmp_dir))
 
     def generateImHR(self):
         """
@@ -158,12 +162,12 @@ class SimuDeblending:
         shapeFSF = self.PSFMuse.shape
 
         self.matrixPSF = np.zeros((self.shapeLR[0],self.shapeLR[1], self.shapeLR[0]*self.shapeLR[1]))
-        for i in xrange(self.shapeLR[0]):
-            for j in xrange(self.shapeLR[1]):
-                self.matrixPSF[max(0,i-shapeFSF[0]/2):min(self.shapeLR[0],i+shapeFSF[0]/2+1),
-                               max(0,j-shapeFSF[1]/2):min(self.shapeLR[1],j+shapeFSF[1]/2+1),j+self.shapeLR[0]*i]\
-                               = self.PSFMuse[int(max(0,shapeFSF[0]/2-i)):int(min(shapeFSF[0], self.shapeLR[0]+shapeFSF[0]*1/2.-i)),
-                               int(max(0,shapeFSF[1]/2-j)):int(min(shapeFSF[1], self.shapeLR[1]+shapeFSF[1]*1/2.-j))]
+        for i in range(self.shapeLR[0]):
+            for j in range(self.shapeLR[1]):
+                self.matrixPSF[max(0,i-shapeFSF[0]//2):min(self.shapeLR[0],i+shapeFSF[0]//2+1),
+                               max(0,j-shapeFSF[1]//2):min(self.shapeLR[1],j+shapeFSF[1]//2+1),j+self.shapeLR[0]*i]\
+                               = self.PSFMuse[int(max(0,shapeFSF[0]//2-i)):int(min(shapeFSF[0], self.shapeLR[0]+shapeFSF[0]*1/2.-i)),
+                               int(max(0,shapeFSF[1]//2-j)):int(min(shapeFSF[1], self.shapeLR[1]+shapeFSF[1]*1/2.-j))]
         self.matrixPSF = self.matrixPSF.reshape((self.shapeLR[0]*self.shapeLR[1],\
                                                  self.shapeLR[0]*self.shapeLR[1]))
 
@@ -171,12 +175,12 @@ class SimuDeblending:
         shapeFSF=self.PSFMuse.shape
 
         self.matrixPSF=np.zeros((self.shapeHR[0],self.shapeHR[1],self.shapeHR[0]*self.shapeHR[1]))
-        for i in xrange(self.shapeHR[0]):
-            for j in xrange(self.shapeHR[1]):
-                self.matrixPSF[max(0, i-shapeFSF[0]/2):min(self.shapeHR[0], i+shapeFSF[0]/2+1),
-                               max(0, j-shapeFSF[1]/2):min(self.shapeHR[1],j+shapeFSF[1]/2+1),j+self.shapeHR[0]*i] \
-                = self.PSFMuse[int(max(0, shapeFSF[0]/2-i)):int(min(shapeFSF[0], self.shapeHR[0]+shapeFSF[0]*1/2.-i)),
-                             int(max(0, shapeFSF[1]/2-j)):int(min(shapeFSF[1], self.shapeHR[1]+shapeFSF[1]*1/2.-j))]
+        for i in range(self.shapeHR[0]):
+            for j in range(self.shapeHR[1]):
+                self.matrixPSF[max(0, i-shapeFSF[0]//2):min(self.shapeHR[0], i+shapeFSF[0]//2+1),
+                               max(0, j-shapeFSF[1]//2):min(self.shapeHR[1],j+shapeFSF[1]//2+1),j+self.shapeHR[0]*i] \
+                = self.PSFMuse[int(max(0, shapeFSF[0]//2-i)):int(min(shapeFSF[0], self.shapeHR[0]+shapeFSF[0]*1/2.-i)),
+                             int(max(0, shapeFSF[1]//2-j)):int(min(shapeFSF[1], self.shapeHR[1]+shapeFSF[1]*1/2.-j))]
         self.matrixPSF = self.matrixPSF.reshape((self.shapeHR[0]*self.shapeHR[1], self.shapeHR[0]*self.shapeHR[1]))
 
     def generateSrc(self, src):

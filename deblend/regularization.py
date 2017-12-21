@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import numpy as np
 
 import scipy.signal as ssl
@@ -38,7 +42,7 @@ def glasso_bic(X,Y,ng=2,multivar=True,listMask=None,
     criterion=[]
     intercepts = np.zeros((1,Y.shape[1]))
     if listMask is None:
-        for k in xrange(Y.shape[1]):
+        for k in range(Y.shape[1]):
             res= lasso_bic(X,Y[:,np.maximum(0,k-ng):k+ng+1],
                                multivar=multivar,averaged=averaged,greedy=greedy)
             coeff[:,k]= res[0][:,np.minimum(k,ng)]
@@ -100,7 +104,7 @@ def lasso_bic(X,Y,multivar=True,greedy=False,averaged=True,returnAll=False):
         coef_path_all = []
     listComb=[]
     if greedy==False: # compute all possible combinations of non-nul objects
-        for k in xrange(1,n_models+1):
+        for k in range(1,n_models+1):
             listComb+=[i for i in itertools.combinations(np.arange(n_models), k)]
     else: #add iteratively the regressor the most strongly correlated to the data in the remaining regressors
         listComb=[[]]
@@ -110,7 +114,7 @@ def lasso_bic(X,Y,multivar=True,greedy=False,averaged=True,returnAll=False):
         residuals=Y-(lprod[a]/np.linalg.norm(X[:,a])*X[:,a])[:,None]
         listModels.pop(a)
         listComb[0]=[a]
-        for k in xrange(1,n_models):
+        for k in range(1,n_models):
             lprod=[np.mean(np.dot(X[:,i],residuals)) for i in listModels]
             a=np.argmax(np.abs(lprod))
             a_m=listModels[a]
@@ -137,7 +141,7 @@ def lasso_bic(X,Y,multivar=True,greedy=False,averaged=True,returnAll=False):
 
     # compute mean squared errors
     mean_squared_error=[]
-    for k in xrange(len(coef_path_)):
+    for k in range(len(coef_path_)):
         R = Y - np.dot(X[:,listComb[k]], coef_path_[k])  # residuals
         mean_squared_error.append(np.mean(R ** 2,axis=0))
     mean_squared_error=np.array(mean_squared_error)
@@ -250,7 +254,7 @@ def getLinesSupportList(listSpe,w=2,wmin=1,wmax=20,alpha=1.4,beta=1.2,
         filt=sst.norm.pdf(np.linspace(-2*w,2*w,4*w+1),scale=w)
         filt=filt/np.linalg.norm(filt)
     listMask=[]
-    for l in xrange(len(listSpe)):
+    for l in range(len(listSpe)):
         spe=listSpe[l]
         sig=1.489*mad(spe) # compute standard deviation estimator from MAD
 
@@ -399,7 +403,7 @@ def oneSigRuleRidge(LRCV):
 #    min_mse=np.mean(np.mean(LRCV.cv_values_,axis=0),axis=0)[ind]
 #    cv=LRCV.cv_values_.shape[0]*LRCV.cv_values_.shape[1]
 #    min_mse_std=np.std(np.std(LRCV.cv_values_,axis=0),axis=0)[ind]/np.sqrt(cv)
-#    alpha=np.max([LRCV.alphas[i] for i in xrange(len(LRCV.alphas)) if np.mean(LRCV.cv_values_[:,:,i])<min_mse+min_mse_std])
+#    alpha=np.max([LRCV.alphas[i] for i in range(len(LRCV.alphas)) if np.mean(LRCV.cv_values_[:,:,i])<min_mse+min_mse_std])
     return alpha
 
 def oneSigRuleMain(alphas,rss):
@@ -420,7 +424,7 @@ def oneSigRuleMain(alphas,rss):
     min_mse=np.mean(np.mean(rss,axis=0),axis=0)[ind]
     cv=rss.shape[0]*rss.shape[1]
     min_mse_std=np.std(np.std(rss,axis=0),axis=0)[ind]/np.sqrt(cv)
-    alpha=np.max([alphas[i] for i in xrange(len(alphas)) if np.mean(rss[:,:,i])<min_mse+min_mse_std])
+    alpha=np.max([alphas[i] for i in range(len(alphas)) if np.mean(rss[:,:,i])<min_mse+min_mse_std])
     return alpha
 
 
@@ -516,9 +520,9 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5,2,50),
     X_centr=X-np.mean(X,axis=0)
     Y_centr=Y-np.mean(Y,axis=0)
 
-    for x in xrange(X_centr.shape[1]):
+    for x in range(X_centr.shape[1]):
         X_centr[:,x]=X_centr[:,x]/np.linalg.norm(X_centr[:,x])
-    for k in xrange(int(np.ceil(Y.shape[1]/float(ng)))):
+    for k in range(int(np.ceil(Y.shape[1]/float(ng)))):
 
         if method=="bic":
             alpha=gridge_bic(X_centr,Y_centr[:,k*ng:(k+1)*ng],alphas)
@@ -624,7 +628,7 @@ def gridge_gcv_spectral(X,Y,support,alphas=np.logspace(-5,2,50),
         cv=rss_alpha.shape[0]*rss_alpha.shape[1]
         min_mse_std = np.std(np.std(rss_alpha,axis=0),axis=0)/np.sqrt(cv)
         min_mse=np.mean(np.mean(rss_alpha,axis=0),axis=0)
-        alpha=np.max([alphas[i] for i in xrange(len(alphas)) if np.mean(rss[:,i])<min_mse+min_mse_std])
+        alpha=np.max([alphas[i] for i in range(len(alphas)) if np.mean(rss[:,i])<min_mse+min_mse_std])
         #alpha = oneSigRuleMain(alphas,rss,std)
     else:
         #alpha = alphas[np.argmin(np.mean(np.average(rss,axis=1,weights=1/Sig2),axis=0))]
@@ -724,7 +728,7 @@ def regulDeblendFunc(X,Y,Y_c=None,l_method='glasso_bic',ng=10,c_method='RCV',cv_
 
         # First we compute one spectrum per object (rough estimation by summing over each intensity map)
         listSpe=[]
-        for i in xrange(X.shape[1]):
+        for i in range(X.shape[1]):
             listSpe.append(np.dot(X[:,i:i+1].T,Y_l)[0])
 
         # Then we seek all spectral lines on this bunch of spectra
@@ -786,7 +790,7 @@ def regulDeblendFunc(X,Y,Y_c=None,l_method='glasso_bic',ng=10,c_method='RCV',cv_
     listA=np.ones((X.shape[1]+1,Y.shape[1]))
 
     if corrflux==True:
-#        for k in xrange(int(np.ceil(Y_c.shape[1]/float(ng)))):
+#        for k in range(int(np.ceil(Y_c.shape[1]/float(ng)))):
 #            r=corrFlux(X,Y_c[:,k*ng:(k+1)*ng],c_coeff[:,k*ng:(k+1)*ng])
 #            c_coeff[:,k*ng:(k+1)*ng] = r[0]
 #            listA[1:,k*ng:(k+1)*ng] = r[1][:,None]

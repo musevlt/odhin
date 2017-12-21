@@ -5,6 +5,9 @@ Created on Wed Jun 28 15:49:56 2017
 
 @author: raphael.bacher@gipsa-lab.fr
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import numpy as np
 import scipy.signal as ssl

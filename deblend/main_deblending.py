@@ -5,6 +5,10 @@ Created on Sun Jan 17 16:31:40 2016
 @author: raphael.bacher@gipsa-lab.fr
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 
 from mpdaf.obj import Cube,Image,Spectrum
 import scipy.signal as ssl
@@ -15,8 +19,8 @@ import scipy.optimize as so
 import os
 import astropy.units as units
 import astropy.io.fits as pyfits
-from regularization import regulDeblendFunc,medfilt
-from deblend_utils import convertFilt, calcFSF, apply_resampling_window, normalize,\
+from .regularization import regulDeblendFunc,medfilt
+from .deblend_utils import convertFilt, calcFSF, apply_resampling_window, normalize,\
                          generateMoffatIm,\
                         convertIntensityMap, getMainSupport, generatePSF_HST
 
@@ -179,14 +183,14 @@ class Deblending():
         self.listIntensityMapHR = []
 
         # for each HST filter, create the high resolution intensity matrix (nbSources x Nb pixels )
-        for j in xrange(len(self.listImagesHR)):
+        for j in range(len(self.listImagesHR)):
             intensityMapHR = np.zeros((self.nbSources,self.listImagesHR[0].shape[0]*self.listImagesHR[0].shape[1]))
             mask = np.zeros(self.listImagesHR[0].shape)
 
             #put intensityMap of background in first position (estimated spectrum of background will also be first)
             intensityMapHR[0] = 1.
 
-            for k in xrange(1,np.max(self.labelHR)+1):
+            for k in range(1,np.max(self.labelHR)+1):
                 mask[self.labelHR == k] = np.maximum(self.listImagesHR[j].data[self.labelHR==k],10**(-9))#avoid negative abundances
                 intensityMapHR[k] = mask.copy().flatten()  # k-1 to manage the background that have label 0 but is pushed to the last position
                 mask[:] = 0
@@ -243,7 +247,7 @@ class Deblending():
 
         # If there are several HR images the process is applied on each image
         # and then the estimated spectra are combined using a mean weighted by the response filters
-        for j in xrange(len(self.listImagesHR)):
+        for j in range(len(self.listImagesHR)):
             self.listAlphas.append([])
             self.listRSS.append([])
             self.listCorrFlux.append([])
@@ -263,7 +267,7 @@ class Deblending():
             self.listIntensityMapLRConvol.append([])
 
             delta = int(self.cubeLR.shape[0]/float(self.nBands))
-            for i in xrange(self.nBands):
+            for i in range(self.nBands):
                 self.listAlphas[j].append([])
                 self.listRSS[j].append([])
                 self.listCorrFlux[j].append([])
@@ -310,17 +314,17 @@ class Deblending():
 
                 if antialias:
                     if transfert_hst:
-                        Y=np.hstack([apply_resampling_window(Y[:,l].reshape(self.shapeLR)).flatten()[:,np.newaxis] for l in xrange(Y.shape[1]) ])
+                        Y=np.hstack([apply_resampling_window(Y[:,l].reshape(self.shapeLR)).flatten()[:,np.newaxis] for l in range(Y.shape[1]) ])
                     else:
-                        Y=np.hstack([apply_resampling_window(ssl.fftconvolve(Y[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same')).flatten()[:,np.newaxis] for l in xrange(Y.shape[1]) ])
-                        Yvar=np.hstack([ssl.fftconvolve(Yvar[:,l].reshape(self.shapeLR),self.PSF_HST**2,mode='same').flatten()[:,np.newaxis] for l in xrange(Y.shape[1]) ])
+                        Y=np.hstack([apply_resampling_window(ssl.fftconvolve(Y[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same')).flatten()[:,np.newaxis] for l in range(Y.shape[1]) ])
+                        Yvar=np.hstack([ssl.fftconvolve(Yvar[:,l].reshape(self.shapeLR),self.PSF_HST**2,mode='same').flatten()[:,np.newaxis] for l in range(Y.shape[1]) ])
 
                 else:
                     if transfert_hst is False:
-                        Y=np.hstack([ssl.fftconvolve(Y[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same').flatten()[:,np.newaxis] for l in xrange(Y.shape[1]) ])
+                        Y=np.hstack([ssl.fftconvolve(Y[:,l].reshape(self.shapeLR),self.PSF_HST,mode='same').flatten()[:,np.newaxis] for l in range(Y.shape[1]) ])
 
                 #normalize intensity maps in flux to get flux-calibrated estimated spectra
-                for u in xrange(U.shape[1]):
+                for u in range(U.shape[1]):
                     U[:,u]=U[:,u]/np.sum(U[:,u])
 
 
@@ -332,7 +336,7 @@ class Deblending():
 
                     # generate support
                     support=np.zeros(U.shape[0]).astype(bool)
-                    for u in xrange(U_.shape[1]):
+                    for u in range(U_.shape[1]):
                          support[U_[:,u]>0.1*np.max(U_[:,u])]=True
 
                     Y_sig2=np.var(Y[~support,:],axis=0)
@@ -391,8 +395,8 @@ class Deblending():
         shape = np.asarray(hst.shape).astype(int)
 
         # get odd shape
-        shape_1 = shape/2 *2 +1
-        center=shape_1/2
+        shape_1 = shape//2 *2 +1
+        center=shape_1//2
         # Extract the dimensions of the expanded Y and X axes.
         ind = np.indices(shape_1)
         rsq=((ind[0]-center[0])*dx)**2 + (((ind[1]-center[1]))*dy)**2
@@ -418,7 +422,7 @@ class Deblending():
             pyfits.writeto(tmp_dir+'wider.fits',im,overwrite=True)
             pyfits.writeto(tmp_dir+'sharper.fits',psf_hst,overwrite=True)
             os.system('export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH')
-            os.system('astconvolve -h 0 -u 0 --kernel=%ssharper.fits --makekernel=%s %swider.fits --output=%skernel_%s.fits'%(tmp_dir,np.maximum(im.shape[0],im.shape[1])/2-1,tmp_dir,tmp_dir,fwhm))
+            os.system('astconvolve -h 0 -u 0 --kernel=%ssharper.fits --makekernel=%s %swider.fits --output=%skernel_%s.fits'%(tmp_dir,np.maximum(im.shape[0],im.shape[1])//2-1,tmp_dir,tmp_dir,fwhm))
 
 
 
@@ -427,12 +431,12 @@ class Deblending():
         """
         Combine spectra estimated on each HST image
         """
-        weigthTot = np.sum([self.filtResp[j] for j in xrange(len(self.filtResp))], axis=0)
-        for i in xrange(self.nbSources):
+        weigthTot = np.sum([self.filtResp[j] for j in range(len(self.filtResp))], axis=0)
+        for i in range(self.nbSources):
             self.sources[i] = np.sum([self.filtResp[j]*self.tmp_sources[j][i]
-                for j in xrange(len(self.filtResp))], axis=0)/weigthTot
+                for j in range(len(self.filtResp))], axis=0)/weigthTot
             self.varSources[i] = np.sum([self.filtResp[j]*self.tmp_var[j][i]
-                for j in xrange(len(self.filtResp))], axis=0)/weigthTot
+                for j in range(len(self.filtResp))], axis=0)/weigthTot
 
 
     def _rebuildCube(self,tmp_sources):
@@ -443,18 +447,18 @@ class Deblending():
         cubeRebuilt = np.zeros((self.cubeLR.shape[0],self.cubeLR.shape[1]*self.cubeLR.shape[2]))
         delta = self.cubeLR.shape[0]/float(self.nBands)
 
-        for i in xrange(self.nBands):
+        for i in range(self.nBands):
             tmp = []
             weightTot = np.sum([self.filtResp[l][int(i*delta):int((i+1)*delta)]
-                            for l in xrange(len(self.filtResp))], axis=0)
+                            for l in range(len(self.filtResp))], axis=0)
 
-            for j in xrange(len(self.filtResp)):
+            for j in range(len(self.filtResp)):
                 tmp.append(np.zeros_like(cubeRebuilt[int(i*delta):int((i+1)*delta),:]))
                 tmp[j] = np.dot(tmp_sources[j][:,int(i*delta):int((i+1)*delta)].T,self.listIntensityMapLRConvol[j][i])
 
             cubeRebuilt[int(i*delta):int((i+1)*delta),:] = np.sum(
                     [(self.filtResp[l][int(i*delta):int((i+1)*delta)]/weightTot)[:,np.newaxis]*tmp[l]
-                    for l in xrange(len(self.filtResp))], axis=0)
+                    for l in range(len(self.filtResp))], axis=0)
 
         cubeRebuilt=cubeRebuilt.reshape(self.cubeLR.shape)
         return cubeRebuilt
@@ -488,7 +492,7 @@ class Deblending():
         Get the list of HST ids for each label of labelHR (first is background 'bg')
         """
 
-        listHST_ID = ['bg']+[int(self.segmap[self.labelHR == k][0]) for k in xrange(1, self.nbSources)]
+        listHST_ID = ['bg']+[int(self.segmap[self.labelHR == k][0]) for k in range(1, self.nbSources)]
         return listHST_ID
 
     def getsp(self):

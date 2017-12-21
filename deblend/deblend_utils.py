@@ -4,6 +4,11 @@ Created on Thu Jun 30 10:53:50 2016
 
 @author: raphael.bacher@gipsa-lab.fr
 """
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import numpy as np
 import scipy.signal as ssl
 from numpy import ma
@@ -23,9 +28,9 @@ def block_sum(ar, fact):
     """
     sx, sy = ar.shape
     X, Y = np.ogrid[0:sx, 0:sy]
-    regions = sy/fact[1] * (X/fact[0]) + Y/fact[1]
+    regions = sy//fact[1] * (X//fact[0]) + Y//fact[1]
     res = ndimage.sum(ar, labels=regions, index=np.arange(regions.max() + 1))
-    res.shape = (sx/fact[0], sy/fact[1])
+    res.shape = (sx//fact[0], sy//fact[1])
     return res
 
 
@@ -34,9 +39,9 @@ def generatePSF_HST(alphaHST, betaHST, shape=(375, 375), shapeMUSE=(25, 25)):
     To increase precision (as this PSF is sharp) the construction is made on a larger array
     then subsampled.
     """
-    PSF_HST_HR = generateMoffatIm(shape=shape, center=(shape[0]/2, shape[1]/2),
+    PSF_HST_HR = generateMoffatIm(shape=shape, center=(shape[0]//2, shape[1]//2),
                                       alpha=alphaHST, beta=betaHST, dim=None)
-    factor = (shape[0]/shapeMUSE[0], shape[1]/shapeMUSE[1])
+    factor = (shape[0]//shapeMUSE[0], shape[1]//shapeMUSE[1])
     PSF_HST = block_sum(PSF_HST_HR, (factor[0], factor[1]))
     PSF_HST[PSF_HST < 0.001] = 0
     PSF_HST = PSF_HST/np.sum(PSF_HST)
@@ -183,7 +188,7 @@ def convertIntensityMap(intensityMap,muse,hst,fwhm,beta,antialias=False,psf_hst=
     else:
         alpha= fwhm / 2.0 / np.sqrt((2.0**(1.0 / beta) - 1.0))
         imPSFMUSE = generateMoffatIm(center=(50,50),shape=(101,101),alpha=alpha,beta=beta,dim='HST')
-    for i in xrange(intensityMap.shape[0]):
+    for i in range(intensityMap.shape[0]):
         hst_ref.data = intensityMap[i].reshape(hst_ref.shape)
 
 

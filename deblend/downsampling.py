@@ -11,6 +11,10 @@ Created on Sun Jan 17 17:16:46 2016
 
 @author: raphael
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import numpy as np
 import numba
 
@@ -23,7 +27,7 @@ def getAbundance(imHR,dim):
     abundanceMap1=np.zeros((dim[1],imHR.shape[1]))
     i=1
 
-    for k in xrange(dim[0]):
+    for k in range(dim[0]):
         r=0
         i=i-1
         while r<np.floor(di):
@@ -34,7 +38,7 @@ def getAbundance(imHR,dim):
         if (r<di) and (i<abundanceMap0.shape[1]):
             abundanceMap0[k][i]= di -r
     j=1
-    for k in xrange(dim[1]):
+    for k in range(dim[1]):
         r=0
         j=j-1
         while r<np.floor(di):
@@ -66,12 +70,12 @@ def downsampling(cubeHR,dim,returnMatrix=False):
     dj=imHR.shape[1]/float(dim[1])
     abundanceMap0,abundanceMap1=getAbundance(imHR,dim)
     downsampleMatrix=np.zeros((imHR.shape[0],imHR.shape[1],cubeLR[0].size))
-    for i in xrange(dim[0]):
-        for j in xrange(dim[1]):
+    for i in range(dim[0]):
+        for j in range(dim[1]):
             downsampleMatrix[max(i*int(np.floor(di))-1,0):(i+1)*int(np.ceil(di))+1,max(0,j*int(np.floor(dj))-1):(j+1)*int(np.ceil(dj))+1,j+dim[0]*i]=numba_outer(abundanceMap0[i,max(0,i*int(np.floor(di))-1):(i+1)*int(np.ceil(di))+1],abundanceMap1[j,max(0,j*int(np.floor(dj))-1):(j+1)*int(np.ceil(dj))+1])
     for k,imHR in enumerate(cubeHR):
-        for i in xrange(dim[0]):
-            for j in xrange(dim[1]):
+        for i in range(dim[0]):
+            for j in range(dim[1]):
                 #imLR[i,j]=np.sum(np.outer(abundanceMap0[i,i*int(np.floor(di))-1:(i+1)*int(np.ceil(di))+1],abundanceMap1[j,j*int(np.floor(dj))-1:(j+1)*int(np.ceil(dj))+1])*imHR[i*int(np.floor(di))-1:(i+1)*int(np.ceil(di))+1,j*int(np.floor(dj))-1:(j+1)*int(np.ceil(dj))+1])
                 cubeLR[k,i,j]=np.sum(numba_outer(abundanceMap0[i,max(i*int(np.floor(di))-1,0):(i+1)*int(np.ceil(di))+1],abundanceMap1[j,max(0,j*int(np.floor(dj))-1):(j+1)*int(np.ceil(dj))+1])*imHR[max(0,i*int(np.floor(di))-1):(i+1)*int(np.ceil(di))+1,max(0,j*int(np.floor(dj))-1):(j+1)*int(np.ceil(dj))+1])
 
