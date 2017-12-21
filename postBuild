@@ -1,0 +1,8 @@
+#!/bin/bash
+
+wget http://ftp.gnu.org/gnu/gnuastro/gnuastro-0.4.tar.gz
+tar xf gnuastro-0.4.tar.gz   
+cd gnuastro-0.4                  
+./configure
+make -j8           
+sudo make install
