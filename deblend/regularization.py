@@ -108,7 +108,7 @@ def lasso_bic(X,Y,multivar=True,greedy=False,averaged=True,returnAll=False):
             listComb+=[i for i in itertools.combinations(np.arange(n_models), k)]
     else: #add iteratively the regressor the most strongly correlated to the data in the remaining regressors
         listComb=[[]]
-        listModels=range(n_models)
+        listModels=list(range(n_models))
         lprod=[np.mean(np.dot(X[:,i],Y)) for i in listModels]
         a=np.argmax(np.abs(lprod))
         residuals=Y-(lprod[a]/np.linalg.norm(X[:,a])*X[:,a])[:,None]

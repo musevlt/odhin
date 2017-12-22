@@ -25,10 +25,10 @@ from .deblend_utils import convertFilt, calcFSF, apply_resampling_window, normal
                         convertIntensityMap, getMainSupport, generatePSF_HST
 
 
-DEFAULT_HSTFILTER606 = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'HST_ACS_WFC.F606W_81.dat')
-DEFAULT_HSTFILTER775 = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'HST_ACS_WFC.F775W_81.dat')
-DEFAULT_HSTFILTER814 = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'HST_ACS_WFC.F814W_81.dat')
-DEFAULT_HSTFILTER850 = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'HST_ACS_WFC.F850LP_81.dat')
+DEFAULT_HSTFILTER606 = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data/HST_ACS_WFC.F606W_81.dat')
+DEFAULT_HSTFILTER775 = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data/HST_ACS_WFC.F775W_81.dat')
+DEFAULT_HSTFILTER814 = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data/HST_ACS_WFC.F814W_81.dat')
+DEFAULT_HSTFILTER850 = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data/HST_ACS_WFC.F850LP_81.dat')
 
 betaHST = 1.6
 alphaHST = np.sqrt((0.085/0.2*15)**2/(4*(2**(1/betaHST)-1)))  # expressed in MUSE pixels
