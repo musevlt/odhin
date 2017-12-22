@@ -3,6 +3,7 @@ channels:
   - defaults
   - openastronomy
 dependencies:
+  - python=3.6
   - matplotlib
   - scikit-learn
   - scipy
