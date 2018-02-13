@@ -5,9 +5,9 @@ Created on Sun Jan 17 16:31:40 2016
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 
 from mpdaf.obj import Cube,Image,Spectrum
@@ -90,47 +90,47 @@ class Deblending():
 
 
         # get FSF parameters (the keys depends from the mosaic orignal field)
-        if 'FSF00FWA' in src.header.keys():
+        if 'FSF00FWA' in list(src.header.keys()):
             self.fsf_a = src.header['FSF00FWA']
             self.fsf_b = src.header['FSF00FWB']
             self.betaFSF = src.header['FSF00BET']
-        elif 'FSF99FWA' in src.header.keys():
+        elif 'FSF99FWA' in list(src.header.keys()):
             self.fsf_a = src.header['FSF99FWA']
             self.fsf_b = src.header['FSF99FWB']
             self.betaFSF = src.header['FSF99BET']
-        elif 'FSF01FWA' in src.header.keys():
+        elif 'FSF01FWA' in list(src.header.keys()):
             self.fsf_a = src.header['FSF01FWA']
             self.fsf_b = src.header['FSF01FWB']
             self.betaFSF = src.header['FSF01BET']
-        elif 'FSF02FWA' in src.header.keys():
+        elif 'FSF02FWA' in list(src.header.keys()):
             self.fsf_a = src.header['FSF02FWA']
             self.fsf_b = src.header['FSF02FWB']
             self.betaFSF = src.header['FSF02BET']
-        elif 'FSF03FWA' in src.header.keys():
+        elif 'FSF03FWA' in list(src.header.keys()):
             self.fsf_a = src.header['FSF03FWA']
             self.fsf_b = src.header['FSF03FWB']
             self.betaFSF = src.header['FSF03BET']
-        elif 'FSF04FWA' in src.header.keys():
+        elif 'FSF04FWA' in list(src.header.keys()):
             self.fsf_a = src.header['FSF04FWA']
             self.fsf_b = src.header['FSF04FWB']
             self.betaFSF = src.header['FSF04BET']
-        elif 'FSF05FWA' in src.header.keys():
+        elif 'FSF05FWA' in list(src.header.keys()):
             self.fsf_a = src.header['FSF05FWA']
             self.fsf_b = src.header['FSF05FWB']
             self.betaFSF = src.header['FSF05BET']
-        elif 'FSF06FWA' in src.header.keys():
+        elif 'FSF06FWA' in list(src.header.keys()):
             self.fsf_a = src.header['FSF06FWA']
             self.fsf_b = src.header['FSF06FWB']
             self.betaFSF = src.header['FSF06BET']
-        elif 'FSF07FWA' in src.header.keys():
+        elif 'FSF07FWA' in list(src.header.keys()):
             self.fsf_a = src.header['FSF07FWA']
             self.fsf_b = src.header['FSF07FWB']
             self.betaFSF = src.header['FSF07BET']
-        elif 'FSF08FWA' in src.header.keys():
+        elif 'FSF08FWA' in list(src.header.keys()):
             self.fsf_a = src.header['FSF08FWA']
             self.fsf_b = src.header['FSF08FWB']
             self.betaFSF = src.header['FSF08BET']
-        elif 'FSF09FWA' in src.header.keys():
+        elif 'FSF09FWA' in list(src.header.keys()):
             self.fsf_a = src.header['FSF09FWA']
             self.fsf_b = src.header['FSF09FWB']
             self.betaFSF = src.header['FSF09BET']
@@ -422,7 +422,7 @@ class Deblending():
             pyfits.writeto(tmp_dir+'wider.fits',im,overwrite=True)
             pyfits.writeto(tmp_dir+'sharper.fits',psf_hst,overwrite=True)
             os.system('export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH')
-            os.system('astconvolve -h 0 -u 0 --kernel=%ssharper.fits --makekernel=%s %swider.fits --output=%skernel_%s.fits'%(tmp_dir,np.maximum(im.shape[0],im.shape[1])//2-1,tmp_dir,tmp_dir,fwhm))
+            os.system('astconvolve -h 0 -u 0 --kernel=%ssharper.fits --makekernel=%s %swider.fits --output=%skernel_%.3f.fits'%(tmp_dir,np.maximum(im.shape[0],im.shape[1])//2-1,tmp_dir,tmp_dir,fwhm))
 
 
 

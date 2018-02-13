@@ -5,9 +5,9 @@ Created on Thu Jun 30 10:53:50 2016
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import numpy as np
 import scipy.signal as ssl
@@ -183,7 +183,7 @@ def convertIntensityMap(intensityMap,muse,hst,fwhm,beta,antialias=False,psf_hst=
 
     if psf_hst == True: #get HST-MUSE transfert function
         tmp_dir='./tmp/'
-        imPSFMUSE = pyfits.open(tmp_dir+'kernel_%s.fits'%fwhm)[1].data
+        imPSFMUSE = pyfits.open(tmp_dir+'kernel_%.3f.fits'%fwhm)[1].data
         imPSFMUSE=imPSFMUSE/np.sum(imPSFMUSE)
     else:
         alpha= fwhm / 2.0 / np.sqrt((2.0**(1.0 / beta) - 1.0))

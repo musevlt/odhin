@@ -5,9 +5,9 @@ Created on Sun Jan 17 14:04:39 2016
 @author: raphael
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import numpy as np
 import scipy.signal as ssl

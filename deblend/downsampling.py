@@ -11,9 +11,9 @@ Created on Sun Jan 17 17:16:46 2016
 
 @author: raphael
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import numpy as np
 import numba

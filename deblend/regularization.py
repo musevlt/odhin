@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import numpy as np
 
@@ -131,9 +131,9 @@ def lasso_bic(X,Y,multivar=True,greedy=False,averaged=True,returnAll=False):
 
     # compute the coeffs (estimated spectra) for each possible model.
     for ind in listComb:
-        coef_path_.append(np.linalg.lstsq(X[:,ind],Y)[0])
+        coef_path_.append(np.linalg.lstsq(X[:,ind],Y,rcond=None)[0])
         if returnAll:
-            coef_path_all.append(np.linalg.lstsq(X[:,ind],Y_all)[0])
+            coef_path_all.append(np.linalg.lstsq(X[:,ind],Y_all,rcond=None)[0])
 
     K = np.log(n_samples*n_targets)  # BIC factor
 
@@ -189,7 +189,7 @@ def lasso_bic(X,Y,multivar=True,greedy=False,averaged=True,returnAll=False):
 
     if criterion_[n_best] < r0: # if not, all regressors stay at 0
         if averaged:
-            coeff[listComb[n_best],:] = np.linalg.lstsq(X[:,listComb[n_best]],Y)[0]
+            coeff[listComb[n_best],:] = np.linalg.lstsq(X[:,listComb[n_best]],Y,rcond=None)[0]
         else:
             coeff[listComb[n_best],:] = coef_path_[n_best]
 
