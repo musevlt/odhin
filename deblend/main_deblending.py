@@ -16,7 +16,7 @@ from .regularization import regulDeblendFunc, medfilt
 from .parameters import Params
 from .deblend_utils import convertFilt, calcFSF, apply_resampling_window, normalize,\
     generateMoffatIm,\
-    convertIntensityMap, getMainSupport, generatePSF_HST,getBlurKernel
+    convertIntensityMap, getMainSupport, generatePSF_HST,getBlurKernel,getBlurKernel2
 
 
 class Deblending():
@@ -416,7 +416,7 @@ class Deblending():
             asq = fwhm**2 / 4.0 / (2.0**(1.0 / self.betaFSF) - 1.0)
             im_muse = 1.0 / (1.0 + rsq / asq)**self.betaFSF
             im_muse = im_muse / np.sum(im_muse)
-            listTransferKernel.append(getBlurKernel(imHR=psf_hst, imLR=im_muse, sizeKer=(21,21)))
+            listTransferKernel.append(getBlurKernel2(imHR=psf_hst, imLR=im_muse, sizeKer=(21,21)))
         return listTransferKernel
 
             

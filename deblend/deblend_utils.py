@@ -14,6 +14,8 @@ import astropy.units as units
 import astropy.io.fits as pyfits
 import math
 from scipy import ndimage
+from photutils import create_matching_kernel
+from photutils import CosineBellWindow,TopHatWindow
 
 import matplotlib.pyplot as plt
 
@@ -461,13 +463,11 @@ def getBlurKernel2(imHR,imLR,sizeKer,returnImBlurred=False):
     imLRsynth - the sharp image convolved with the recovered kernel
  
     """
-
-    imLR_fft = np.fft.rfft2(imLR)
-    imHR_fft = np.fft.rfft2(imHR)
     
-    # reshape and rotate 180 degrees to get the convolution kernel
-    kernel = np.fft.irfft2(imLR_fft/imHR_fft)
-    imLRsynth = ssl.fftconvolve(imHR, kernel, 'valid')
+    window = TopHatWindow(0.35)
+
+    kernel = create_matching_kernel(imHR,imLR,window=window)
+    imLRsynth = ssl.fftconvolve(imHR, kernel, 'same')
     residuals = np.sum((imLR-imLRsynth)**2)
     if residuals > 0.1 * np.sum(imLR**2):
         print("Warning : residuals are strong, maybe the linear inversion is not constrained enough.")
