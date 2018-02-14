@@ -407,17 +407,16 @@ def rescale_hst_like_muse(hst, muse, inplace=True):
 def getBlurKernel(imHR,imLR,sizeKer,returnImBlurred=False):
     """
     Compute convolution kernel between two images (typically one from HST and one from MUSE)
-    Use of the 
     
     Parameters:
     -----------
-    B,G - gray level blurred and sharp images respectively (double)
+    imLR,imHR - blurred and sharp images respectively
     szKer - 2 element vector specifying the size of the required kernel
     
     Returns:
     -------
-    mKer - the recovered kernel, 
-    imBsynth - the sharp image convolved with the recovered kernel
+    kernel - the recovered kernel, 
+    imLRsynth - the sharp image convolved with the recovered kernel
 
  
     """
@@ -447,7 +446,38 @@ def getBlurKernel(imHR,imLR,sizeKer,returnImBlurred=False):
     
     return kernel
     
-    np.maximum(im.shape[0],im.shape[1])
+def getBlurKernel2(imHR,imLR,sizeKer,returnImBlurred=False):
+    """
+    Compute convolution kernel between two images (typically one from HST and one from MUSE)
+    
+    Parameters:
+    -----------
+    imLR,imHR - blurred and sharp images respectively
+    szKer - 2 element vector specifying the size of the required kernel
+    
+    Returns:
+    -------
+    kernel - the recovered kernel, 
+    imLRsynth - the sharp image convolved with the recovered kernel
+ 
+    """
+
+    imLR_fft = np.fft.rfft2(imLR)
+    imHR_fft = np.fft.rfft2(imHR)
+    
+    # reshape and rotate 180 degrees to get the convolution kernel
+    kernel = np.fft.irfft2(imLR_fft/imHR_fft)
+    imLRsynth = ssl.fftconvolve(imHR, kernel, 'valid')
+    residuals = np.sum((imLR-imLRsynth)**2)
+    if residuals > 0.1 * np.sum(imLR**2):
+        print("Warning : residuals are strong, maybe the linear inversion is not constrained enough.")
+        print(residuals, np.sum(imLR**2))
+
+    
+    if returnImBlurred is True:
+        return kernel,imLRsynth  
+    
+    return kernel
                 
 def im2col_sliding_strided(A, block_size, stepsize=1):
     """

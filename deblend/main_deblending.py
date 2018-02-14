@@ -3,7 +3,6 @@
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-
 from mpdaf.obj import Cube, Image, Spectrum
 import scipy.signal as ssl
 import scipy.sparse.linalg as sla
