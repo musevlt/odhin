@@ -443,7 +443,7 @@ class Deblending():
 
     def _generateHSTMUSE_transfert_PSF(self):
         """
-        Generate HST-MUSE transfert PSF using astconvolve
+        Generate HST-MUSE transfert PSF 
         """
         hst = self.listImagesHR[0]
 
@@ -464,31 +464,14 @@ class Deblending():
         psf_hst = 1.0 / (1.0 + rsq / asq_hst)**betaHST
         psf_hst = psf_hst / np.sum(psf_hst)
 
+        self.listTransfertKernel = []
         for fwhm in self.listFWHM:
             asq = fwhm**2 / 4.0 / (2.0**(1.0 / self.betaFSF) - 1.0)
-            im = 1.0 / (1.0 + rsq / asq)**self.betaFSF
-            im = im / np.sum(im)
+            im_muse = 1.0 / (1.0 + rsq / asq)**self.betaFSF
+            im_muse = im_muse / np.sum(im_muse)
+            self.listTransfertKernel.append(getBlurKernel(imHR=psf_hst,imLR=im_muse))
 
-            tmp_dir = './tmp/'
-            try:
-                os.makedirs(tmp_dir)
-            except OSError:
-                if not os.path.isdir(tmp_dir):
-                    raise
-            pyfits.writeto(tmp_dir + 'wider.fits', im, overwrite=True)
-            pyfits.writeto(tmp_dir + 'sharper.fits', psf_hst, overwrite=True)
-            os.system('export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH')
-            os.system(
-                'astconvolve -h 0 -u 0 --kernel=%ssharper.fits --makekernel=%s %swider.fits --output=%skernel_%.3f.fits' %
-                (tmp_dir,
-                 np.maximum(
-                     im.shape[0],
-                     im.shape[1]) //
-                    2 -
-                    1,
-                    tmp_dir,
-                    tmp_dir,
-                    fwhm))
+            
 
     def _combineSpectra(self):
         """

@@ -441,11 +441,6 @@ def oneSigRuleRidge(LRCV):
     rss = LRCV.cv_values_
     alphas = LRCV.alphas
     alpha = oneSigRuleMain(alphas, rss)
-#    ind=np.argmin(np.mean(np.mean(LRCV.cv_values_,axis=0),axis=0))
-#    min_mse=np.mean(np.mean(LRCV.cv_values_,axis=0),axis=0)[ind]
-#    cv=LRCV.cv_values_.shape[0]*LRCV.cv_values_.shape[1]
-#    min_mse_std=np.std(np.std(LRCV.cv_values_,axis=0),axis=0)[ind]/np.sqrt(cv)
-#    alpha=np.max([LRCV.alphas[i] for i in range(len(LRCV.alphas)) if np.mean(LRCV.cv_values_[:,:,i])<min_mse+min_mse_std])
     return alpha
 
 
@@ -654,7 +649,6 @@ def gridge_gcv_spectral(X,
     UtY2 = UtY**2
     # listInd=np.nonzero(support)[0]
 
-    # rss=np.zeros((len(listInd),Y.shape[1],len(alphas)))
     rss = np.zeros((Y.shape[1], len(alphas)))
     for a, alpha in enumerate(alphas):
         if not cross_spectral:
@@ -691,7 +685,6 @@ def gridge_gcv_spectral(X,
                         if np.mean(rss[:, i]) < min_mse + min_mse_std])
         #alpha = oneSigRuleMain(alphas,rss,std)
     else:
-        #alpha = alphas[np.argmin(np.mean(np.average(rss,axis=1,weights=1/Sig2),axis=0))]
         alpha = alphas[np.argmin(np.average(rss, axis=0, weights=1 / Sig2))]
     if alpha > np.max(sval) * maxAlphaFrac:
         alpha = np.max(sval) * maxAlphaFrac
@@ -700,7 +693,7 @@ def gridge_gcv_spectral(X,
 
 
 def _diag_dot(D, B):
-    # compute dot(diag(D), B)
+    """compute dot(diag(D), B)""" 
     if len(B.shape) > 1:
         # handle case where B is > 1-d
         D = D[(slice(None), ) + (np.newaxis, ) * (len(B.shape) - 1)]
@@ -708,7 +701,7 @@ def _diag_dot(D, B):
 
 
 def _decomp_diag(v_prime, Q):
-    # compute diagonal of the matrix: dot(Q, dot(diag(v_prime), Q^T))
+    """compute diagonal of the matrix: dot(Q, dot(diag(v_prime), Q^T))"""
     return (v_prime * Q ** 2).sum(axis=-1)
 
 
@@ -733,7 +726,7 @@ def medfilt(x, k):
 def regulDeblendFunc(X,
                      Y,
                      Y_c=None,
-                     l_method='glasso_bic',
+                     l_method='gbic',
                      ng=10,
                      c_method='RCV',
                      cv_l=5,
@@ -822,22 +815,9 @@ def regulDeblendFunc(X,
             n_sig=1.4,
             filt=None)
 
-    if l_method == 'glasso_bic':  # preferred approach : group bic approach
+    if l_method == 'gbic':  # preferred approach : group bic approach
         l_coeff, l_intercepts = glasso_bic(X, Y_l, ng=ng, listMask=listMask,
                                            multivar=multivar)
-
-    elif l_method == 'glasso_cv':  # use group lasso with cross validation
-        # to avoid CV instability we work with pixels with strong enough signal
-        # (*support*)
-        if support is not None:
-            X1 = X[support, :]
-            Y_l1 = Y_l[support, :]
-        else:
-            X1 = X
-            Y_l1 = Y_l
-        l_coeff, l_intercepts = glasso_cv(X1, Y_l1, ng=ng, cv=cv_l, recompute=recompute,
-                                          n_alphas=n_alphas, eps=eps, listMask=listMask,
-                                          oneSig=oneSig)
 
     # remove estimated contribution from emission lines
     Y_c = Y - np.dot(X, l_coeff) - l_intercepts
@@ -881,10 +861,6 @@ def regulDeblendFunc(X,
     listA = np.ones((X.shape[1] + 1, Y.shape[1]))
 
     if corrflux:
-        #        for k in range(int(np.ceil(Y_c.shape[1]/float(ng)))):
-        #            r=corrFlux(X,Y_c[:,k*ng:(k+1)*ng],c_coeff[:,k*ng:(k+1)*ng])
-        #            c_coeff[:,k*ng:(k+1)*ng] = r[0]
-        #            listA[1:,k*ng:(k+1)*ng] = r[1][:,None]
         #   compute on whole block
         r = corrFlux(X, Y_c, c_coeff)
         c_coeff = r[0]
@@ -903,7 +879,7 @@ def corrFlux(X, Y, beta):
     """
     Correct coefficients to limit flux loss
     We seek a diagonal matrix A to minimize ||Y-X*A*beta||^2 with A_ii>=1
-    (as we know there has been some flux loss)
+    (as we know there has been some flux loss).
 
     Parameters
     ----------

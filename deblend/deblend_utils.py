@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jun 30 10:53:50 2016
-
 @author: raphael.bacher@gipsa-lab.fr
 """
 
@@ -33,7 +31,8 @@ def block_sum(ar, fact):
 
 
 def generatePSF_HST(alphaHST, betaHST, shape=(375, 375), shapeMUSE=(25, 25)):
-    """Generate PSF HST at MUSE resolution with Moffat model.
+    """
+    Generate PSF HST at MUSE resolution with Moffat model.
     To increase precision (as this PSF is sharp) the construction is made on a larger array
     then subsampled.
     """
@@ -54,7 +53,7 @@ def generatePSF_HST(alphaHST, betaHST, shape=(375, 375), shapeMUSE=(25, 25)):
 
 def getMainSupport(u, alpha=0.999):
     """
-    Get mask containing fraction alpha of total map intensity.
+    Get mask containing a fraction alpha of total map intensity.
     """
     mask = np.zeros_like(u).astype(bool)
     for i, row in enumerate(u):
@@ -141,6 +140,7 @@ def generateMoffatIm(
         dy=0.,
         dim='MUSE'):
     """
+    Generate Moffat FSF image
     By default alpha is supposed to be given in arsec, if not it is given in MUSE pixel.
     a,b allow to decenter slightly the Moffat image.
     """
@@ -158,7 +158,7 @@ def generateMoffatIm(
 
 def normalize(a, axis=-1, order=2, returnCoeff=False):
     """
-    normalize array along axis
+    Normalize array along axis
     """
     l2 = np.atleast_1d(np.linalg.norm(a, order, axis))
     l2[l2 == 0] = 1
@@ -416,3 +416,63 @@ def rescale_hst_like_muse(hst, muse, inplace=True):
     hst.unit = muse.unit
 
     return hst
+
+def getBlurKernel(imHR,imLR,sizeKer,returnImBlurred=False):
+    """
+    Compute convolution kernel between two images (typically one from HST and one from MUSE)
+    Use of the 
+    
+    Parameters:
+    -----------
+    B,G - gray level blurred and sharp images respectively (double)
+    szKer - 2 element vector specifying the size of the required kernel
+    
+    Returns:
+    -------
+    mKer - the recovered kernel, 
+    imBsynth - the sharp image convolved with the recovered kernel
+
+ 
+    """
+
+    # get the "valid" pixels from imLR (i.e. those that do not depend 
+    # on zero-padding or a circular assumption)
+
+    imLRvalid = imLR[int(np.floor(sizeKer[0]/2)):-int(np.floor(sizeKer[0]/2)), int(np.floor(sizeKer[1]/2)): -int(np.floor(sizeKer[1]/2))]
+    # get a matrix where each row corresponds to a block from imHR
+    # the size of the kernel
+
+    imHRconv = im2col_sliding_strided(imHR, sizeKer).T
+    # solve the over-constrained system using least squares
+    # to get a vector version of the cross-correlation kernel
+    vXcorrKer,residuals,_,_ = np.linalg.lstsq(imHRconv,imLRvalid.flatten(),rcond=None)
+
+    # reshape and rotate 180 degrees to get the convolution kernel
+    kernel = np.rot90(vXcorrKer.reshape(sizeKer), 2)
+    print(residuals, np.sum(imLRvalid**2))
+    if residuals > 0.1 * np.sum(imLRvalid**2):
+        print("Warning : residuals are strong, maybe the linear inversion is not constrained enough.")
+    
+    if returnImBlurred is True:
+        imLRsynth = ssl.fftconvolve(imHR, kernel, 'valid');
+        return kernel,imLRsynth  
+    
+    return kernel
+    
+    np.maximum(im.shape[0],im.shape[1])
+                
+def im2col_sliding_strided(A, block_size, stepsize=1):
+    """
+    Implement im2col 'sliding' from MATLAB
+    """
+    
+    # Parameters
+    m,n = A.shape
+    s0, s1 = A.strides    
+    nrows = m-block_size[0]+1
+    ncols = n-block_size[1]+1
+    shp = block_size[0],block_size[1],nrows,ncols
+    strd = s0,s1,s0,s1
+
+    out_view = np.lib.stride_tricks.as_strided(A, shape=shp, strides=strd)
+    return out_view.reshape(block_size[0]*block_size[1],-1)[:,::stepsize]        
