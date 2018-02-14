@@ -174,8 +174,7 @@ def convertIntensityMap(
         hst,
         fwhm,
         beta,
-        antialias=False,
-        psf_hst=True):
+        imPSFMUSE):
     """
     Parameters
     ----------
@@ -190,11 +189,6 @@ def convertIntensityMap(
         fwhm of MUSE FSF
     beta : `float`
         Moffat beta parameter of MUSE FSF
-    antialias : `bool`
-        Use antialising filter or not.
-        Default to False (because a broad convolution is applied afterwards)
-    psf_hst : `bool`
-        Use HST-MUSE transfert function instead of MUSE FSF. Default to True
 
 
     Returns
@@ -206,22 +200,15 @@ def convertIntensityMap(
     intensityMapMuse = np.zeros((intensityMap.shape[0], muse.data.size))
     hst_ref = hst.copy()
 
-    if psf_hst:  # get HST-MUSE transfert function
-        tmp_dir = './tmp/'
-        imPSFMUSE = pyfits.open(tmp_dir + 'kernel_%.3f.fits' % fwhm)[1].data
-        imPSFMUSE = imPSFMUSE / np.sum(imPSFMUSE)
-    else:
-        alpha = fwhm / 2.0 / np.sqrt((2.0**(1.0 / beta) - 1.0))
-        imPSFMUSE = generateMoffatIm(
-            center=(
-                50, 50), shape=(
-                101, 101), alpha=alpha, beta=beta, dim='HST')
+
+    
+    imPSFMUSE = imPSFMUSE / np.sum(imPSFMUSE)
     for i in range(intensityMap.shape[0]):
         hst_ref.data = intensityMap[i].reshape(hst_ref.shape)
 
         hst_ref.data = ssl.fftconvolve(hst_ref.data, imPSFMUSE, mode='same')
         hst_ref_muse = regrid_hst_like_muse(hst_ref, muse, inplace=False,
-                                            antialias=antialias)
+                                            antialias=False)
 
         hst_ref_muse = rescale_hst_like_muse(hst_ref_muse, muse, inplace=False)
         hst_ref_muse.mask[:] = False
@@ -233,7 +220,7 @@ def convertIntensityMap(
 # functions taken from muse_analysis and slighlty modified
 
 
-def regrid_hst_like_muse(hst, muse, inplace=True, antialias=True):
+def regrid_hst_like_muse(hst, muse, inplace=True, antialias=False):
     """
     Resample an HST image onto the spatial coordinate grid of a given
     MUSE image or MUSE cube.

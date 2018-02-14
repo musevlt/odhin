@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Jan 17 16:31:40 2016
-
 @author: raphael.bacher@gipsa-lab.fr
 """
 
@@ -16,31 +14,10 @@ import os
 import astropy.units as units
 import astropy.io.fits as pyfits
 from .regularization import regulDeblendFunc, medfilt
+from .parameters import Params
 from .deblend_utils import convertFilt, calcFSF, apply_resampling_window, normalize,\
     generateMoffatIm,\
-    convertIntensityMap, getMainSupport, generatePSF_HST
-
-
-DEFAULT_HSTFILTER606 = os.path.join(
-    os.path.dirname(
-        os.path.abspath(__file__)),
-    '../data/HST_ACS_WFC.F606W_81.dat')
-DEFAULT_HSTFILTER775 = os.path.join(
-    os.path.dirname(
-        os.path.abspath(__file__)),
-    '../data/HST_ACS_WFC.F775W_81.dat')
-DEFAULT_HSTFILTER814 = os.path.join(
-    os.path.dirname(
-        os.path.abspath(__file__)),
-    '../data/HST_ACS_WFC.F814W_81.dat')
-DEFAULT_HSTFILTER850 = os.path.join(
-    os.path.dirname(
-        os.path.abspath(__file__)),
-    '../data/HST_ACS_WFC.F850LP_81.dat')
-
-betaHST = 1.6
-# expressed in MUSE pixels
-alphaHST = np.sqrt((0.085 / 0.2 * 15)**2 / (4 * (2**(1 / betaHST) - 1)))
+    convertIntensityMap, getMainSupport, generatePSF_HST,getBlurKernel
 
 
 class Deblending():
@@ -63,9 +40,9 @@ class Deblending():
     Attributes
     ----------
 
-    cubeRebuilt : numpy.ndarray
+    estimatedCube : numpy.ndarray
         Estimated cube
-    cubeRebuiltCont : numpy.ndarray
+    estimatedCubeCont : numpy.ndarray
         Estimated cube continuum
     residuals : numpy.ndarray
         The cube of residuals (datacube - estimated cube)
@@ -73,22 +50,19 @@ class Deblending():
         list of estimated spectra
     varSources: list
         list of variances of estimated spectra
-
-    listIntensityMap (HR,LR,LRConvol) : list
-    list of Abundance Map of each object detected, at each step :
-        High resolution, after subsampling, and after convolution
+    listIntensityMap (HR, LRConvol) : list
+        list of Abundance Map of each object detected, at high resolution, 
+        and after convolution and subsampling
 
 
 
     """
 
-    def __init__(self, src, listFiltName=[DEFAULT_HSTFILTER606,
-                                          DEFAULT_HSTFILTER775,
-                                          DEFAULT_HSTFILTER814,
-                                          DEFAULT_HSTFILTER850],
-                 nBands=10):
+    def __init__(self, src, 
+                 params=Params()):
 
         self.src = src
+        self.params = params
         self.cubeLR = src.cubes['MUSE_CUBE'].data.filled(
             np.nanmedian(src.cubes['MUSE_CUBE'].data))
 
@@ -149,23 +123,24 @@ class Deblending():
             self.fsf_b = src.header['FSF09FWB']
             self.betaFSF = src.header['FSF09BET']
 
+        self.nBands = self.params.nBands
         self.listFWHM = [self.fsf_a +
                          self.fsf_b *
                          (l +
                           (l_min -
                            l_max) /
-                             nBands) for l in np.linspace(l_min, l_max, nBands)]
+                             self.nBands) for l in np.linspace(l_min, l_max, nBands)]
 
-        self.nBands = nBands
-        if listFiltName is not None:
+        
+        if self.params.listFiltName is not None:
             self.filtResp = [
                 convertFilt(
                     np.loadtxt(filtName),
-                    self.wave) for filtName in listFiltName]
+                    self.wave) for filtName in self.params.listFiltName]
         else:
             self.filtResp = [np.ones(self.cubeLR.shape[0])] * 4
 
-        # needeed for muse_analysis
+        # needeed for muse_analysis functions
         for k, im in enumerate(self.listImagesHR):
             im.primary_header['FILTER'] = [
                 'f606w', 'f775w', 'f814w', 'f850lp'][k]
@@ -180,7 +155,7 @@ class Deblending():
             (self.cubeLR.shape[0],
              self.cubeLR.shape[1] *
              self.cubeLR.shape[2]))
-        self.PSF_HST = generatePSF_HST(alphaHST, betaHST)
+        self.PSF_HST = generatePSF_HST(self.params.alphaHST, self.params.betaHST)
 
     def createIntensityMap(self, segmap=None, thresh=None):
         """
@@ -231,17 +206,10 @@ class Deblending():
 
             self.listIntensityMapHR.append(intensityMapHR)
 
-    def findSources(self, transfert_hst=True, antialias=False,
-                    regul=False, store=False, filt_w=101):
+    def findSources(self, regul=True, store=False, filt_w=101):
         """
         Main function : estimate sources spectra
 
-        transfert_hst: bool
-            if True, the transfert function from HST to MUSE
-            is estimated and used on HST images instead of MUSE PSF
-            if False :apply HST PSF on MUSE images and MUSE PSF on HST images
-        antialias: bool
-            apply antialias filter or not
         regul: bool
             add regularization or not
         store: bool
@@ -256,10 +224,10 @@ class Deblending():
             self.cubeLR_c = np.vstack([medfilt(y, filt_w) for y in self.cubeLR.reshape(
                 shape[0], shape[1] * shape[2]).T]).T.reshape(shape)
 
-        if transfert_hst:
-            # compute HST-MUSE transfert functions for all MUSE FSF fwhm
-            # considered
-            self._generateHSTMUSE_transfert_PSF()
+        
+        # compute HST-MUSE transfer functions for all MUSE FSF fwhm
+        # considered
+        self.listTransferKernel = self._generateHSTMUSE_transfer_PSF()
 
         self.sources = np.zeros((self.nbSources, self.cubeLR.shape[0]))
         self.varSources = np.zeros((self.nbSources, self.cubeLR.shape[0]))
@@ -316,23 +284,24 @@ class Deblending():
                 # Create intensity maps at MUSE resolution
                 intensityMapLRConvol = convertIntensityMap(
                     self.listIntensityMapHR[j],
-                    self.src.cubes['MUSE_CUBE'][
-                        0,
-                        :,
-                        :],
+                    self.src.cubes['MUSE_CUBE'][0,:,:],
                     self.listImagesHR[j],
                     self.listFWHM[i],
-                    self.betaFSF,
-                    antialias=antialias,
-                    psf_hst=transfert_hst)
+                    self.params.betaFSF,
+                    self.listTransferKernel[i])
 
-                # truncate intensity maps support after convolution
+                # truncate intensity map support after convolution
                 supp = getMainSupport(intensityMapLRConvol[1:], alpha=0.999)
                 intensityMapLRConvol[1:][~supp] = 0
 
                 # put ones everywhere for background intensity map
                 intensityMapLRConvol[0] = 1.
 
+                
+                # U : n x k (n number of pixels, k number of objects, lmbda number of wavelengths)
+                # Y : n x lmbda
+                # Yvar : n x lmbda
+                
                 U = intensityMapLRConvol.T
                 Y = self.cubeLR[i * delta:(i + 1) * delta].reshape(
                     self.cubeLR[i * delta:(i + 1) * delta].shape[0],
@@ -344,31 +313,6 @@ class Deblending():
                 Yvar = self.cubeLRVar[i * delta:(i + 1) * delta].reshape(
                     self.cubeLRVar[i * delta:(i + 1) * delta].shape[0],
                     self.cubeLRVar.shape[1] * self.cubeLRVar.shape[2]).T
-
-                # U : n x k (n number of pixels, k number of objects, lmbda number of wavelengths)
-                # Y : n x lmbda
-                # Yvar : n x lmbda
-
-                if antialias:
-                    if transfert_hst:
-                        Y = np.hstack([apply_resampling_window(Y[:, l].reshape(self.shapeLR)).flatten()[
-                                      :, np.newaxis] for l in range(Y.shape[1])])
-                    else:
-                        Y = np.hstack([apply_resampling_window(ssl.fftconvolve(Y[:, l].reshape(
-                            self.shapeLR), self.PSF_HST, mode='same')).flatten()[:, np.newaxis] for l in range(Y.shape[1])])
-                        Yvar = np.hstack([ssl.fftconvolve(Yvar[:,
-                                                               l].reshape(self.shapeLR),
-                                                          self.PSF_HST**2,
-                                                          mode='same').flatten()[:,
-                                                                                 np.newaxis] for l in range(Y.shape[1])])
-
-                else:
-                    if transfert_hst is False:
-                        Y = np.hstack([ssl.fftconvolve(Y[:,
-                                                         l].reshape(self.shapeLR),
-                                                       self.PSF_HST,
-                                                       mode='same').flatten()[:,
-                                                                              np.newaxis] for l in range(Y.shape[1])])
 
                 # normalize intensity maps in flux to get flux-calibrated
                 # estimated spectra
@@ -392,7 +336,7 @@ class Deblending():
                         Y,
                         Y_c=Y_c,
                         ng=200,
-                        l_method='glasso_bic',
+                        l_method='gbic',
                         c_method='gridge_cv',
                         corrflux=True,
                         support=support,
@@ -441,9 +385,9 @@ class Deblending():
         self._getContinuumCube()
         self._getResiduals()
 
-    def _generateHSTMUSE_transfert_PSF(self):
+    def _generateHSTMUSE_transfer_PSF(self):
         """
-        Generate HST-MUSE transfert PSF 
+        Generate HST-MUSE transfer PSF 
         """
         hst = self.listImagesHR[0]
 
@@ -454,22 +398,24 @@ class Deblending():
         # get odd shape
         shape_1 = shape // 2 * 2 + 1
         center = shape_1 // 2
-        # Extract the dimensions of the expanded Y and X axes.
+        
+        # Build "distances to center" matrix.
         ind = np.indices(shape_1)
         rsq = ((ind[0] - center[0]) * dx)**2 + (((ind[1] - center[1])) * dy)**2
-        betaHST = 1.6
-        fwhm_hst = 0.085
 
-        asq_hst = fwhm_hst**2 / 4.0 / (2.0**(1.0 / betaHST) - 1.0)
-        psf_hst = 1.0 / (1.0 + rsq / asq_hst)**betaHST
+        # Build HST FSF
+        asq_hst = self.params.fwhmHST**2 / 4.0 / (2.0**(1.0 / self.params.betaHST) - 1.0)
+        psf_hst = 1.0 / (1.0 + rsq / asq_hst)**self.params.betaHST
         psf_hst = psf_hst / np.sum(psf_hst)
 
-        self.listTransfertKernel = []
+        listTransferKernel = []
         for fwhm in self.listFWHM:
-            asq = fwhm**2 / 4.0 / (2.0**(1.0 / self.betaFSF) - 1.0)
-            im_muse = 1.0 / (1.0 + rsq / asq)**self.betaFSF
+            # Build MUSE FSF
+            asq = fwhm**2 / 4.0 / (2.0**(1.0 / self.params.betaFSF) - 1.0)
+            im_muse = 1.0 / (1.0 + rsq / asq)**self.params.betaFSF
             im_muse = im_muse / np.sum(im_muse)
-            self.listTransfertKernel.append(getBlurKernel(imHR=psf_hst,imLR=im_muse))
+            listTransferKernel.append(getBlurKernel(imHR=psf_hst,imLR=im_muse))
+        return listTransferKernel
 
             
 
@@ -490,7 +436,7 @@ class Deblending():
         Create estimated cube. We have to work on each MUSE spectral bin as
         the spatial distribution is different on each bin
         """
-        cubeRebuilt = np.zeros(
+        estimatedCube = np.zeros(
             (self.cubeLR.shape[0],
              self.cubeLR.shape[1] *
              self.cubeLR.shape[2]))
@@ -503,20 +449,20 @@ class Deblending():
 
             for j in range(len(self.filtResp)):
                 tmp.append(np.zeros_like(
-                    cubeRebuilt[int(i * delta):int((i + 1) * delta), :]))
+                    estimatedCube[int(i * delta):int((i + 1) * delta), :]))
                 tmp[j] = np.dot(tmp_sources[j][:,
                                                int(i * delta):int((i + 1) * delta)].T,
                                 self.listIntensityMapLRConvol[j][i])
 
-            cubeRebuilt[int(i * delta):int((i + 1) * delta), :] = np.sum(
+            estimatedCube[int(i * delta):int((i + 1) * delta), :] = np.sum(
                 [(self.filtResp[l][int(i * delta):int((i + 1) * delta)] / weightTot)[:, np.newaxis] * tmp[l]
                  for l in range(len(self.filtResp))], axis=0)
 
-        cubeRebuilt = cubeRebuilt.reshape(self.cubeLR.shape)
-        return cubeRebuilt
+        estimatedCube = estimatedCube.reshape(self.cubeLR.shape)
+        return estimatedCube
 
     def _getResiduals(self):
-        self.residuals = self.cubeLR - self.cubeRebuilt
+        self.residuals = self.cubeLR - self.estimatedCube
 
     def _getContinuumCube(self, w=101):
         """
@@ -527,7 +473,7 @@ class Deblending():
             ssl.medfilt(
                 tmp_source, kernel_size=(
                     1, w)) for tmp_source in self.tmp_sources]
-        self.cubeRebuiltCont = self._rebuildCube(self.tmp_sourcesCont)
+        self.estimatedCubeCont = self._rebuildCube(self.tmp_sourcesCont)
 
     def _getLabel(self, segmap=None):
         """
