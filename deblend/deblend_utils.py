@@ -436,9 +436,10 @@ def getBlurKernel(imHR,imLR,sizeKer,returnImBlurred=False):
 
     # reshape and rotate 180 degrees to get the convolution kernel
     kernel = np.rot90(vXcorrKer.reshape(sizeKer), 2)
-    print(residuals, np.sum(imLRvalid**2))
     if residuals > 0.1 * np.sum(imLRvalid**2):
         print("Warning : residuals are strong, maybe the linear inversion is not constrained enough.")
+        print(residuals, np.sum(imLRvalid**2))
+
     
     if returnImBlurred is True:
         imLRsynth = ssl.fftconvolve(imHR, kernel, 'valid');

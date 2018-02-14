@@ -59,10 +59,13 @@ class Deblending():
     """
 
     def __init__(self, src, 
-                 params=Params()):
+                 params=None):
 
         self.src = src
+        if params is None:
+            params = Params()
         self.params = params
+        
         self.cubeLR = src.cubes['MUSE_CUBE'].data.filled(
             np.nanmedian(src.cubes['MUSE_CUBE'].data))
 
@@ -129,7 +132,7 @@ class Deblending():
                          (l +
                           (l_min -
                            l_max) /
-                             self.nBands) for l in np.linspace(l_min, l_max, nBands)]
+                             self.nBands) for l in np.linspace(l_min, l_max, self.nBands)]
 
         
         if self.params.listFiltName is not None:
@@ -151,7 +154,7 @@ class Deblending():
             (self.cubeLR.shape[0],
              self.cubeLR.shape[1] *
              self.cubeLR.shape[2]))
-        self.cubeRebuilt = np.zeros(
+        self.estimatedCube = np.zeros(
             (self.cubeLR.shape[0],
              self.cubeLR.shape[1] *
              self.cubeLR.shape[2]))
@@ -287,7 +290,7 @@ class Deblending():
                     self.src.cubes['MUSE_CUBE'][0,:,:],
                     self.listImagesHR[j],
                     self.listFWHM[i],
-                    self.params.betaFSF,
+                    self.betaFSF,
                     self.listTransferKernel[i])
 
                 # truncate intensity map support after convolution
@@ -381,7 +384,7 @@ class Deblending():
                 self.listIntensityMapLRConvol[j].append(intensityMapLRConvol)
 
         self._combineSpectra()
-        self.cubeRebuilt = self._rebuildCube(self.tmp_sources)
+        self.estimatedCube = self._rebuildCube(self.tmp_sources)
         self._getContinuumCube()
         self._getResiduals()
 
@@ -411,10 +414,10 @@ class Deblending():
         listTransferKernel = []
         for fwhm in self.listFWHM:
             # Build MUSE FSF
-            asq = fwhm**2 / 4.0 / (2.0**(1.0 / self.params.betaFSF) - 1.0)
-            im_muse = 1.0 / (1.0 + rsq / asq)**self.params.betaFSF
+            asq = fwhm**2 / 4.0 / (2.0**(1.0 / self.betaFSF) - 1.0)
+            im_muse = 1.0 / (1.0 + rsq / asq)**self.betaFSF
             im_muse = im_muse / np.sum(im_muse)
-            listTransferKernel.append(getBlurKernel(imHR=psf_hst,imLR=im_muse))
+            listTransferKernel.append(getBlurKernel(imHR=psf_hst, imLR=im_muse, sizeKer=(21,21)))
         return listTransferKernel
 
             
