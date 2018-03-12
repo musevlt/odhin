@@ -405,50 +405,8 @@ def rescale_hst_like_muse(hst, muse, inplace=True):
     hst.unit = muse.unit
 
     return hst
-
-def getBlurKernel(imHR,imLR,sizeKer,returnImBlurred=False):
-    """
-    Compute convolution kernel between two images (typically one from HST and one from MUSE)
     
-    Parameters:
-    -----------
-    imLR,imHR - blurred and sharp images respectively
-    szKer - 2 element vector specifying the size of the required kernel
-    
-    Returns:
-    -------
-    kernel - the recovered kernel, 
-    imLRsynth - the sharp image convolved with the recovered kernel
-
- 
-    """
-
-    # get the "valid" pixels from imLR (i.e. those that do not depend 
-    # on zero-padding or a circular assumption)
-
-    imLRvalid = imLR[int(np.floor(sizeKer[0]/2)):-int(np.floor(sizeKer[0]/2)), int(np.floor(sizeKer[1]/2)): -int(np.floor(sizeKer[1]/2))]
-    # get a matrix where each row corresponds to a block from imHR
-    # the size of the kernel
-
-    imHRconv = im2col_sliding_strided(imHR, sizeKer).T
-    # solve the over-constrained system using least squares
-    # to get a vector version of the cross-correlation kernel
-    vXcorrKer,residuals,_,_ = np.linalg.lstsq(imHRconv,imLRvalid.flatten(),rcond=None)
-
-    # reshape and rotate 180 degrees to get the convolution kernel
-    kernel = np.rot90(vXcorrKer.reshape(sizeKer), 2)
-    if residuals > 0.1 * np.sum(imLRvalid**2):
-        print("Warning : residuals are strong, maybe the linear inversion is not constrained enough.")
-        print(residuals, np.sum(imLRvalid**2))
-
-    
-    if returnImBlurred is True:
-        imLRsynth = ssl.fftconvolve(imHR, kernel, 'valid');
-        return kernel,imLRsynth  
-    
-    return kernel
-    
-def getBlurKernel2(imHR,imLR,sizeKer,returnImBlurred=False):
+def getBlurKernel(imHR,imLR,sizeKer,returnImBlurred=False,cut=0.001):
     """
     Compute convolution kernel between two images (typically one from HST and one from MUSE)
     
@@ -473,24 +431,8 @@ def getBlurKernel2(imHR,imLR,sizeKer,returnImBlurred=False):
         print("Warning : residuals are strong, maybe the linear inversion is not constrained enough.")
         print(residuals, np.sum(imLR**2))
 
-    
+    kernel[kernel<cut]=0.
     if returnImBlurred is True:
         return kernel,imLRsynth  
     
     return kernel
-                
-def im2col_sliding_strided(A, block_size, stepsize=1):
-    """
-    Implement im2col 'sliding' from MATLAB
-    """
-    
-    # Parameters
-    m,n = A.shape
-    s0, s1 = A.strides    
-    nrows = m-block_size[0]+1
-    ncols = n-block_size[1]+1
-    shp = block_size[0],block_size[1],nrows,ncols
-    strd = s0,s1,s0,s1
-
-    out_view = np.lib.stride_tricks.as_strided(A, shape=shp, strides=strd)
-    return out_view.reshape(block_size[0]*block_size[1],-1)[:,::stepsize]        
