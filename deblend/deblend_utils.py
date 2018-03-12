@@ -212,7 +212,7 @@ def convertIntensityMap(
         hst_ref_muse = regrid_hst_like_muse(hst_ref, muse, inplace=False,
                                             antialias=False)
 
-        hst_ref_muse = rescale_hst_like_muse(hst_ref_muse, muse, inplace=False)
+        hst_ref_muse = rescale_hst_like_muse(hst_ref_muse, muse, inplace=True)
         hst_ref_muse.mask[:] = False
 
         intensityMapMuse[i] = hst_ref_muse.data.flatten()
@@ -406,7 +406,7 @@ def rescale_hst_like_muse(hst, muse, inplace=True):
 
     return hst
     
-def getBlurKernel(imHR,imLR,sizeKer,returnImBlurred=False,cut=0.001):
+def getBlurKernel(imHR,imLR,sizeKer,returnImBlurred=False,cut=0.00001):
     """
     Compute convolution kernel between two images (typically one from HST and one from MUSE)
     
