@@ -26,8 +26,11 @@ class Deblending():
 
     Parameters
     ----------
-    src : mpdaf Source
-        The mpdaf Source object to be deblended
+    cube : mpdaf Cube
+        The mpdaf Cube object to be deblended
+    HSTimages:
+        HST mpdaf images
+    
     listFiltName : list of filenames
         list of filenames of HST response filters.
     nbands : int
@@ -57,73 +60,31 @@ class Deblending():
 
     """
 
-    def __init__(self, src, 
-                 params=None):
+    def __init__(self, cube, HSTImages,    params=None):
 
-        self.src = src
+        self.cube = cube
         if params is None:
             params = Params()
         self.params = params
-        
-        self.cubeLR = src.cubes['MUSE_CUBE'].data.filled(
-            np.nanmedian(src.cubes['MUSE_CUBE'].data))
+        self.HSTImages = HSTImages
+        self.cubeLR = cube.data.filled(
+            np.nanmedian(cube.data))
 
-        self.cubeLRVar = src.cubes['MUSE_CUBE'].var.filled(
-            np.nanmedian(src.cubes['MUSE_CUBE'].var))
-        self.wcs = src.cubes['MUSE_CUBE'].wcs
-        self.wave = src.cubes['MUSE_CUBE'].wave
+        self.cubeLRVar = cube.var.filled(
+            np.nanmedian(cube.var))
+        self.wcs = cube.wcs
+        self.wave = cube.wave
         self.listImagesHR = [
-            src.images['HST_F606W'].copy(),
-            src.images['HST_F775W'].copy(),
-            src.images['HST_F814W'].copy(),
-            src.images['HST_F850LP'].copy()]
-        l_min, l_max = src.cubes['MUSE_CUBE'].wave.get_range()
+            HSTImages['HST_F606W'].copy(),
+            HSTImages['HST_F775W'].copy(),
+            HSTImages['HST_F814W'].copy(),
+            HSTImages['HST_F850LP'].copy()]
+        l_min, l_max = cube.wave.get_range()
 
         # get FSF parameters (the keys depends from the mosaic orignal field)
-        if 'FSF00FWA' in list(src.header.keys()):
-            self.fsf_a = src.header['FSF00FWA']
-            self.fsf_b = src.header['FSF00FWB']
-            self.betaFSF = src.header['FSF00BET']
-        elif 'FSF99FWA' in list(src.header.keys()):
-            self.fsf_a = src.header['FSF99FWA']
-            self.fsf_b = src.header['FSF99FWB']
-            self.betaFSF = src.header['FSF99BET']
-        elif 'FSF01FWA' in list(src.header.keys()):
-            self.fsf_a = src.header['FSF01FWA']
-            self.fsf_b = src.header['FSF01FWB']
-            self.betaFSF = src.header['FSF01BET']
-        elif 'FSF02FWA' in list(src.header.keys()):
-            self.fsf_a = src.header['FSF02FWA']
-            self.fsf_b = src.header['FSF02FWB']
-            self.betaFSF = src.header['FSF02BET']
-        elif 'FSF03FWA' in list(src.header.keys()):
-            self.fsf_a = src.header['FSF03FWA']
-            self.fsf_b = src.header['FSF03FWB']
-            self.betaFSF = src.header['FSF03BET']
-        elif 'FSF04FWA' in list(src.header.keys()):
-            self.fsf_a = src.header['FSF04FWA']
-            self.fsf_b = src.header['FSF04FWB']
-            self.betaFSF = src.header['FSF04BET']
-        elif 'FSF05FWA' in list(src.header.keys()):
-            self.fsf_a = src.header['FSF05FWA']
-            self.fsf_b = src.header['FSF05FWB']
-            self.betaFSF = src.header['FSF05BET']
-        elif 'FSF06FWA' in list(src.header.keys()):
-            self.fsf_a = src.header['FSF06FWA']
-            self.fsf_b = src.header['FSF06FWB']
-            self.betaFSF = src.header['FSF06BET']
-        elif 'FSF07FWA' in list(src.header.keys()):
-            self.fsf_a = src.header['FSF07FWA']
-            self.fsf_b = src.header['FSF07FWB']
-            self.betaFSF = src.header['FSF07BET']
-        elif 'FSF08FWA' in list(src.header.keys()):
-            self.fsf_a = src.header['FSF08FWA']
-            self.fsf_b = src.header['FSF08FWB']
-            self.betaFSF = src.header['FSF08BET']
-        elif 'FSF09FWA' in list(src.header.keys()):
-            self.fsf_a = src.header['FSF09FWA']
-            self.fsf_b = src.header['FSF09FWB']
-            self.betaFSF = src.header['FSF09BET']
+        self.fsf_a = 0.869
+        self.fsf_b = -3.401e-05
+        self.betaFSF = 2.8
 
         self.nBands = self.params.nBands
         self.listFWHM = [self.fsf_a +
@@ -305,7 +266,7 @@ class Deblending():
                     # Create intensity maps at MUSE resolution
                     intensityMapLRConvol = convertIntensityMap(
                         self.listIntensityMapHR[j],
-                        self.src.cubes['MUSE_CUBE'][0,:,:],
+                        self.cube[0,:,:],
                         self.listImagesHR[j],
                         self.listFWHM[i],
                         self.betaFSF,
@@ -541,6 +502,6 @@ class Deblending():
             cat[key] = Spectrum(
                 data=self.sources[k],
                 var=self.varSources[k],
-                wave=self.src.spectra['MUSE_TOT'].wave)
+                wave=self.cube.wave)
 
         return cat
