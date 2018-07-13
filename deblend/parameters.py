@@ -38,7 +38,7 @@ class Params():
                  fsf_beta_muse = 2.8, #Beta parameter for MUSE FSF Moffat model
                  fsf_wavelength=7000, # mean wavelegnth to be used for grouping (where white MUSE image is used)
                  cut = 0.005, # absolute cut value for convolution during grouping
-                 min_width = 5, # minimal width of a group bounding box
+                 min_width = 6, # minimal width of a group bounding box
                  listFiltName=[DEFAULT_HSTFILTER606, # hst spectral filter response
                                DEFAULT_HSTFILTER775,
                                DEFAULT_HSTFILTER814,
