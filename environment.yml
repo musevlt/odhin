@@ -12,3 +12,4 @@ dependencies:
   - photutils
   - pip:
     - mpdaf
+    - tqdm
