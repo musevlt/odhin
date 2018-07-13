@@ -222,8 +222,7 @@ def mad(arr):
         Indices variabililty of the sample.
         https://en.wikipedia.org/wiki/Median_absolute_deviation
     """
-    arr = np.ma.array(arr).compressed(
-    )  # should be faster to not use masked arrays.
+    # arr = np.ma.array(arr).compressed()  # should be faster to not use masked arrays.
     med = np.median(arr)
     return np.median(np.abs(arr - med))
 
@@ -342,7 +341,8 @@ def getLinesSupportList(
                     if len(np.nonzero(
                             spe[k:k + width + 1] < beta * sig)[0]) > 0:
                         b = k + \
-                            np.nonzero(spe[k:k + width + 1] < beta * sig)[0][0] + 2
+                            np.nonzero(spe[k:k + width + 1] <
+                                       beta * sig)[0][0] + 2
                     else:
                         b = k + width + 1
                 else:
@@ -643,6 +643,7 @@ def gridge_gcv_spectral(X,
     Xs = X[support]
     if Sig2 is None:
         Sig2 = np.ones(Y.shape[1])
+
     sumSig2 = Sig2[:-2] + Sig2[2:]
     U, sval, V = np.linalg.svd(Xs, full_matrices=False)
     UtY = np.dot(U.T, Ys)
@@ -693,7 +694,7 @@ def gridge_gcv_spectral(X,
 
 
 def _diag_dot(D, B):
-    """compute dot(diag(D), B)""" 
+    """compute dot(diag(D), B)"""
     if len(B.shape) > 1:
         # handle case where B is > 1-d
         D = D[(slice(None), ) + (np.newaxis, ) * (len(B.shape) - 1)]
