@@ -15,7 +15,9 @@ import astropy.io.fits as pyfits
 import math
 from scipy import ndimage
 from photutils import create_matching_kernel
-from photutils import CosineBellWindow,TopHatWindow
+from photutils import CosineBellWindow, TopHatWindow
+from skimage.measure import regionprops, label
+from photutils import SegmentationImage
 
 import matplotlib.pyplot as plt
 
@@ -40,12 +42,11 @@ def generatePSF_HST(alphaHST, betaHST, shape=(375, 375), shapeMUSE=(25, 25)):
     """
     PSF_HST_HR = generateMoffatIm(
         shape=shape,
-        center=(
-            shape[0] // 2,
-            shape[1] // 2),
+        center=(shape[0] // 2, shape[1] // 2),
         alpha=alphaHST,
         beta=betaHST,
-        dim=None)
+        dim=None,
+    )
     factor = (shape[0] // shapeMUSE[0], shape[1] // shapeMUSE[1])
     PSF_HST = block_sum(PSF_HST_HR, (factor[0], factor[1]))
     PSF_HST[PSF_HST < 0.001] = 0
@@ -80,15 +81,20 @@ def apply_resampling_window(im):
     # Nyquist folding frequency (ie. 0.5 cycles/image_pixel).
     shape = im.shape
     imfft = np.fft.rfft2(im)
-    f = np.sqrt((np.fft.rfftfreq(shape[1]) / 0.5)**2 +
-                (np.fft.fftfreq(shape[0]) / 0.5)[np.newaxis, :].T**2)
+    f = np.sqrt(
+        (np.fft.rfftfreq(shape[1]) / 0.5)
+        ** 2
+        + (np.fft.fftfreq(shape[0]) / 0.5)[np.newaxis, :].T
+        ** 2
+    )
 
     # Scale the FFT by the window function, calculating the blackman
     # window function as a function of frequency divided by its cutoff
     # frequency.
 
-    imfft *= np.where(f <= 1.0, 0.42 + 0.5 * np.cos(np.pi *
-                                                    f) + 0.08 * np.cos(2 * np.pi * f), 0.0)
+    imfft *= np.where(
+        f <= 1.0, 0.42 + 0.5 * np.cos(np.pi * f) + 0.08 * np.cos(2 * np.pi * f), 0.0
+    )
     return np.fft.irfft2(imfft, shape)
 
 
@@ -105,10 +111,7 @@ def convertFilt(filt, wave=None, x=None):
     return np.array(f(x))
 
 
-def calcFSF(
-    a, b, beta, listLambda, center=(
-        12, 12), shape=(
-            25, 25), dim='MUSE'):
+def calcFSF(a, b, beta, listLambda, center=(12, 12), shape=(25, 25), dim="MUSE"):
     """
     Build list of FSF images (np arrays) from parameters a,b and beta.
     fwhm=a+b*lmbda, and beta is the Moffat parameter.
@@ -117,7 +120,7 @@ def calcFSF(
     for lmbda in listLambda:
         fwhm = a + b * lmbda
 
-        alpha = np.sqrt(fwhm**2 / (4 * (2**(1 / beta) - 1)))
+        alpha = np.sqrt(fwhm ** 2 / (4 * (2 ** (1 / beta) - 1)))
         listFSF.append(generateMoffatIm(center, shape, alpha, beta, dim=dim))
     return listFSF
 
@@ -126,32 +129,22 @@ def Moffat(r, alpha, beta):
     """
     Compute Moffat values for array of distances *r* and Moffat parameters *alpha* and *beta*
     """
-    return (beta - 1) / (math.pi * alpha**2) * (1 + (r / alpha)**2)**(-beta)
+    return (beta - 1) / (math.pi * alpha ** 2) * (1 + (r / alpha) ** 2) ** (-beta)
 
 
 def generateMoffatIm(
-        center=(
-            12,
-            12),
-    shape=(
-            25,
-            25),
-        alpha=2,
-        beta=2.5,
-        dx=0.,
-        dy=0.,
-        dim='MUSE'):
+    center=(12, 12), shape=(25, 25), alpha=2, beta=2.5, dx=0., dy=0., dim="MUSE"
+):
     """
     Generate Moffat FSF image
     By default alpha is supposed to be given in arsec, if not it is given in MUSE pixel.
     a,b allow to decenter slightly the Moffat image.
     """
     ind = np.indices(shape)
-    r = np.sqrt(((ind[0] - center[0] + dx)**2 +
-                 ((ind[1] - center[1] + dy))**2))
-    if dim == 'MUSE':
+    r = np.sqrt(((ind[0] - center[0] + dx) ** 2 + ((ind[1] - center[1] + dy)) ** 2))
+    if dim == "MUSE":
         r = r * 0.2
-    elif dim == 'HST':
+    elif dim == "HST":
         r = r * 0.03
     res = Moffat(r, alpha, beta)
     res = res / np.sum(res)
@@ -170,13 +163,7 @@ def normalize(a, axis=-1, order=2, returnCoeff=False):
         return a / np.expand_dims(l2, axis)
 
 
-def convertIntensityMap(
-        intensityMap,
-        muse,
-        hst,
-        fwhm,
-        beta,
-        imPSFMUSE):
+def convertIntensityMap(intensityMap, muse, hst, fwhm, beta, imPSFMUSE):
     """
     Parameters
     ----------
@@ -202,15 +189,14 @@ def convertIntensityMap(
     intensityMapMuse = np.zeros((intensityMap.shape[0], muse.data.size))
     hst_ref = hst.copy()
 
-
-    
     imPSFMUSE = imPSFMUSE / np.sum(imPSFMUSE)
     for i in range(intensityMap.shape[0]):
         hst_ref.data = intensityMap[i].reshape(hst_ref.shape)
 
-        hst_ref.data = ssl.fftconvolve(hst_ref.data, imPSFMUSE, mode='same')
-        hst_ref_muse = regrid_hst_like_muse(hst_ref, muse, inplace=False,
-                                            antialias=False)
+        hst_ref.data = ssl.fftconvolve(hst_ref.data, imPSFMUSE, mode="same")
+        hst_ref_muse = regrid_hst_like_muse(
+            hst_ref, muse, inplace=False, antialias=False
+        )
 
         hst_ref_muse = rescale_hst_like_muse(hst_ref_muse, muse, inplace=True)
         hst_ref_muse.mask[:] = False
@@ -262,18 +248,14 @@ def regrid_hst_like_muse(hst, muse, inplace=True, antialias=False):
 
     # "
     # Removed here because we work on intensity maps with lot of zeros
-    #np.ma.masked_inside(hst.data, -1e-10, 1e-10, copy=False)
+    # np.ma.masked_inside(hst.data, -1e-10, 1e-10, copy=False)
     #########
 
     # Resample the HST image onto the same coordinate grid as the MUSE
     # image.
-
     return hst.align_with_image(
-        muse,
-        cutoff=0.0,
-        flux=True,
-        inplace=True,
-        antialias=antialias)
+        muse, cutoff=0.0, flux=True, inplace=False, antialias=antialias
+    )
 
 
 class HstFilterInfo(object):
@@ -319,14 +301,30 @@ class HstFilterInfo(object):
     # numbers.
 
     _filters = {
-        "F606W": {"abmag_zero": 26.51, "photplam": 5921.1,
-                  "photflam": 7.73e-20, "photbw": 672.3},
-        "F775W": {"abmag_zero": 25.69, "photplam": 7692.4,
-                  "photflam": 9.74e-20, "photbw": 434.4},
-        "F814W": {"abmag_zero": 25.94, "photplam": 8057.0,
-                  "photflam": 7.05e-20, "photbw": 652.0},
-        "F850LP": {"abmag_zero": 24.87, "photplam": 9033.1,
-                   "photflam": 1.50e-19, "photbw": 525.7}
+        "F606W": {
+            "abmag_zero": 26.51,
+            "photplam": 5921.1,
+            "photflam": 7.73e-20,
+            "photbw": 672.3,
+        },
+        "F775W": {
+            "abmag_zero": 25.69,
+            "photplam": 7692.4,
+            "photflam": 9.74e-20,
+            "photbw": 434.4,
+        },
+        "F814W": {
+            "abmag_zero": 25.94,
+            "photplam": 8057.0,
+            "photflam": 7.05e-20,
+            "photbw": 652.0,
+        },
+        "F850LP": {
+            "abmag_zero": 24.87,
+            "photplam": 9033.1,
+            "photflam": 1.50e-19,
+            "photbw": 525.7,
+        },
     }
 
     def __init__(self, hst):
@@ -339,13 +337,17 @@ class HstFilterInfo(object):
         if isinstance(hst, str):
             self.filter_name = hst.upper()
         elif "FILTER" in hst.primary_header:
-            self.filter_name = hst.primary_header['FILTER'].upper()
-        elif ("FILTER1" in hst.primary_header and
-              hst.primary_header['FILTER1'] != 'CLEAR1L'):
-            self.filter_name = hst.primary_header['FILTER1'].upper()
-        elif ("FILTER2" in hst.primary_header and
-              hst.primary_header['FILTER2'] != 'CLEAR2L'):
-            self.filter_name = hst.primary_header['FILTER2'].upper()
+            self.filter_name = hst.primary_header["FILTER"].upper()
+        elif (
+            "FILTER1" in hst.primary_header
+            and hst.primary_header["FILTER1"] != "CLEAR1L"
+        ):
+            self.filter_name = hst.primary_header["FILTER1"].upper()
+        elif (
+            "FILTER2" in hst.primary_header
+            and hst.primary_header["FILTER2"] != "CLEAR2L"
+        ):
+            self.filter_name = hst.primary_header["FILTER2"].upper()
 
         # Get the dictionary of the characteristics of the filter.
 
@@ -354,10 +356,10 @@ class HstFilterInfo(object):
 
         # Record the characteristics of the filer.
 
-        self.abmag_zero = info['abmag_zero']
-        self.photflam = info['photflam']
-        self.photplam = info['photplam']
-        self.photbw = info['photbw']
+        self.abmag_zero = info["abmag_zero"]
+        self.photflam = info["photflam"]
+        self.photplam = info["photplam"]
+        self.photbw = info["photbw"]
 
 
 def rescale_hst_like_muse(hst, muse, inplace=True):
@@ -401,38 +403,171 @@ def rescale_hst_like_muse(hst, muse, inplace=True):
 
     hst.data *= cal
     if hst.var is not None:
-        hst.var *= cal**2
+        hst.var *= cal ** 2
     hst.unit = muse.unit
 
     return hst
-    
-def getBlurKernel(imHR,imLR,sizeKer,returnImBlurred=False,cut=0.00001):
+
+
+def getBlurKernel(imHR, imLR, sizeKer, returnImBlurred=False, cut=0.00001):
     """
     Compute convolution kernel between two images (typically one from HST and one from MUSE)
-    
+
     Parameters:
     -----------
     imLR,imHR - blurred and sharp images respectively
     szKer - 2 element vector specifying the size of the required kernel
-    
+
     Returns:
     -------
-    kernel - the recovered kernel, 
+    kernel - the recovered kernel,
     imLRsynth - the sharp image convolved with the recovered kernel
- 
+
     """
-    
+
     window = TopHatWindow(0.35)
 
-    kernel = create_matching_kernel(imHR,imLR,window=window)
-    imLRsynth = ssl.fftconvolve(imHR, kernel, 'same')
-    residuals = np.sum((imLR-imLRsynth)**2)
-    if residuals > 0.1 * np.sum(imLR**2):
-        print("Warning : residuals are strong, maybe the linear inversion is not constrained enough.")
-        print(residuals, np.sum(imLR**2))
+    kernel = create_matching_kernel(imHR, imLR, window=window)
+    imLRsynth = ssl.fftconvolve(imHR, kernel, "same")
+    residuals = np.sum((imLR - imLRsynth) ** 2)
+    if residuals > 0.1 * np.sum(imLR ** 2):
+        print(
+            "Warning : residuals are strong, maybe the linear inversion is not constrained enough."
+        )
+        print(residuals, np.sum(imLR ** 2))
 
-    kernel[kernel<cut]=0.
+    kernel[kernel < cut] = 0.
     if returnImBlurred is True:
-        return kernel,imLRsynth  
-    
+        return kernel, imLRsynth
+
     return kernel
+
+def _getLabel( segmap=None):
+    """
+    Create a new segmap with contiguous indices
+    """
+    label_image = np.zeros(segmap.shape, dtype='int')
+    i = 0
+    for k in sorted(set(segmap.flatten())):
+        label_image[segmap == k] = i
+        i = i + 1
+
+    return label_image
+
+def calcMainKernelTransfert(params,imHST):
+    """
+    Build transfert kernel between an HR kernel and LR kernel (defined in paramaters)
+    """
+    # get parameters 
+    fsf_beta_muse = params.fsf_beta_muse
+    fwhm_muse = params.fwhm_muse
+    fwhm_hst=params.fwhm_hst
+    beta_hst=params.beta_hst
+
+    hst = imHST
+
+    dy, dx = hst.get_step(unit=units.arcsec)
+
+    shape = np.asarray(hst.shape).astype(int)
+
+    # get odd shape
+    shape_1 = shape // 2 * 2 + 1
+    center = shape_1 // 2
+
+    # Build "distances to center" matrix.
+    ind = np.indices(shape_1)
+    rsq = ((ind[0] - center[0]) * dx)**2 + (((ind[1] - center[1])) * dy)**2
+
+    # Build HST FSF
+    asq_hst = fwhm_hst**2 / 4.0 / \
+        (2.0**(1.0 / beta_hst) - 1.0)
+    psf_hst = 1.0 / (1.0 + rsq / asq_hst)**beta_hst
+    psf_hst = psf_hst / np.sum(psf_hst)
+
+
+    # Build MUSE FSF
+    asq = fwhm_muse**2 / 4.0 / (2.0**(1.0 / fsf_beta_muse) - 1.0)
+    im_muse = 1.0 / (1.0 + rsq / asq)**fsf_beta_muse
+    im_muse = im_muse / np.sum(im_muse)
+
+    return getBlurKernel(imHR=psf_hst, imLR=im_muse, sizeKer=(21, 21))
+
+def createIntensityMap(imHR, segmap, imLR, kernel_transfert,params=None):
+    """
+    Create intensity maps from HST images and segmentation map.
+
+    Parameters
+    ----------
+    imHR: the reference high resolution image
+    segmap : the segmantation map at high resolution
+    imLR : image at the targeted low resolution
+    kernel_transfert : convolution kernel from imHR to imLR
+    params : additionnal parameters
+
+    """
+    if params is None:
+        params = Params()
+    
+    # create image of label reindexed squentially from 0 to nSources
+    segmapIm = SegmentationImage(segmap.data) 
+    segmapIm.relabel_sequential()
+    labelHR = segmapIm.data
+    
+    intensityMapHR = np.zeros(imHR.shape)
+    intensityMapHR[labelHR > 0] = np.maximum(
+        imHR.data[segmap.data > 0], 10**(-9))  # avoid negative abundances
+    
+    intensityMapLRConvol = convertIntensityMap(
+        intensityMapHR[None, :],
+        imLR,
+        imHR,
+        params.fwhm_muse,
+        params.fsf_beta_muse,
+        kernel_transfert).reshape(imLR.shape)
+
+    return intensityMapLRConvol
+
+
+def modifSegmap(segmap, cat):
+    """
+    Avoid discrepancy between the catalog and the segmentation map (there are some segmap objects missing from the Rafelski 2015 catalog)
+    """
+    segmap2 = segmap.copy()
+    keys_cat = cat['ID']
+    keys = np.unique(segmap.data.data)
+    for k in keys:
+        if k not in keys_cat:
+            ##### to log somewhere
+            #print(k)
+            ####
+            segmap2.data[segmap.data == k] = 0
+    return segmap2
+
+def get_cat_from_segmap(segmap):
+    """
+    Get IDs and center directly from a segmap (thus removing the need for an external catalag)
+    """
+    ## To be build
+    pass
+
+def extractHST(imHST, imMUSE, rot=True):
+    """
+    extract HST image corresping to MUSE image
+    """
+    center = imMUSE.wcs.pix2sky((imMUSE.shape[0]//2, imMUSE.shape[1]//2))[0]
+    step = imMUSE.get_step(units.Unit("arcsec"))
+    stepHST = imHST.get_step(units.Unit("arcsec"))
+    size = (step[1]*imMUSE.shape[1], step[0] *
+            imMUSE.shape[0])  # width then height
+    # size[0] is width so second dimension of the array
+    sizeHST = (size[0]/stepHST[1], size[1]/stepHST[0])
+    ext_size = (size[1]+10, size[0]+10)
+    ext_sizeHST = (ext_size[0]/stepHST[1], ext_size[1]/stepHST[0])
+    centerHST = imHST.wcs.sky2pix(center, nearest=True)[0]
+    if rot is True:
+        imHST_tmp = imHST.subimage(center, ext_sizeHST, unit_size=None)
+        imHST_tmp = imHST_tmp.rotate(imMUSE.get_rot())
+        imHST2 = imHST_tmp.subimage(center, sizeHST, unit_size=None)
+    else:
+        imHST2 = imHST.subimage(center, sizeHST, unit_size=None)
+    return imHST2
