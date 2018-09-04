@@ -122,6 +122,7 @@ class ODHIN():
             blob = (self.imLabel == i+1)
             subcube, subhstimages, subsegmap, listObjInBlob,listHSTObjInBlob = scaling.getInputs(
                 self.cube, self.hstimages, self.segmap, blob, reg.bbox, self.imLabel, self.cat)
+
             results_async.append(pool.apply_async(scaling.deblendGroup, args=(
                 subcube, subhstimages, subsegmap, listObjInBlob,listHSTObjInBlob,i), callback=update))
 

@@ -110,10 +110,7 @@ class Deblending():
             (self.cubeLR.shape[0],
              self.cubeLR.shape[1] *
              self.cubeLR.shape[2]))
-        self.estimatedCube = np.zeros(
-            (self.cubeLR.shape[0],
-             self.cubeLR.shape[1] *
-             self.cubeLR.shape[2]))
+        self.estimatedCube = self.cube.clone()
         self.PSF_HST = generatePSF_HST(
             self.params.alpha_hst, self.params.beta_hst)
 
@@ -375,7 +372,8 @@ class Deblending():
                         np.zeros((self.nbSources, self.shapeLR[0]*self.shapeLR[1])))
 
         self._combineSpectra()
-        self.estimatedCube = self._rebuildCube(self.tmp_sources)
+        self.estimatedCube.data = self._rebuildCube(self.tmp_sources)
+        
         self._getContinuumCube()
         self._getResiduals()
 
@@ -456,7 +454,7 @@ class Deblending():
         return estimatedCube
 
     def _getResiduals(self):
-        self.residuals = self.cubeLR - self.estimatedCube
+        self.residuals = self.cubeLR - self.estimatedCube.data
 
     def _getContinuumCube(self, w=101):
         """

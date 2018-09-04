@@ -60,7 +60,7 @@ def getRes(debl, listObjInBlob, listHSTObjInBlob, group_id=0):
         data_rows.append((ID, xi2, cond_number,group_id)) 
     t = table.Table(rows=data_rows, names=('ID', 'Xi2','Condition Number','G_ID'))
     
-    return t,dic_spec,debl.cubeLR,debl.estimatedCube,group_id,cond_number,xi2_tot
+    return t,dic_spec,debl.cube,debl.estimatedCube,group_id,cond_number,xi2_tot
 
 
 def copyHeaderWCSInfo(new):
