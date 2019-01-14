@@ -17,7 +17,7 @@ from astropy import table
 
 class ODHIN():
 
-    def __init__(self, cube, hstimages, segmap, cat, params=None,imMUSE=None,imHST=None,main_kernel_transfert=None):
+    def __init__(self, cube, hstimages, segmap, cat, params=None,imMUSE=None,imHST=None,main_kernel_transfert=None,write_dir=None):
         """
         Main class for deblending process
 
@@ -52,6 +52,7 @@ class ODHIN():
         self.segmap = segmap
         self.cat = cat
         self.params = params
+        self.write_dir = write_dir
         if params is None:
             self.params = Params()
         self.groups = None
@@ -122,9 +123,8 @@ class ODHIN():
             blob = (self.imLabel == i+1)
             subcube, subhstimages, subsegmap, listObjInBlob,listHSTObjInBlob = scaling.getInputs(
                 self.cube, self.hstimages, self.segmap, blob, reg.bbox, self.imLabel, self.cat)
-
             results_async.append(pool.apply_async(scaling.deblendGroup, args=(
-                subcube, subhstimages, subsegmap, listObjInBlob,listHSTObjInBlob,i), callback=update))
+                subcube, subhstimages, subsegmap, listObjInBlob,listHSTObjInBlob,i,self.write_dir), callback=update))
 
         pool.close()
         pool.join()
@@ -141,14 +141,18 @@ class ODHIN():
         self.dict_estimated_cube = {}
         self.dict_observed_cube = {}
         for res in results:
-            table_tmp,dict_spec_tmp,cube_observed_tmp,cube_estimated_tmp,group_id, cond_number, xi2 = res.get()
+            if self.write_dir is None:
+                table_tmp,dict_spec_tmp,cube_observed_tmp,cube_estimated_tmp,group_id, cond_number, xi2 = res.get()
+            else:
+                table_tmp,dict_spec_tmp,group_id, cond_number, xi2 = res.get()
             if self.table_sources is None:
                 self.table_sources = table_tmp
             else:
                  self.table_sources = table.vstack([self.table_sources,table_tmp])
             self.dict_spec.update(dict_spec_tmp)
-            self.dict_estimated_cube[group_id] = cube_estimated_tmp
-            self.dict_observed_cube[group_id] = cube_observed_tmp
+            if self.write_dir is None:
+                self.dict_estimated_cube[group_id] = cube_estimated_tmp
+                self.dict_observed_cube[group_id] = cube_observed_tmp
             self.table_groups.loc[group_id]['Xi2'] = xi2
             self.table_groups.loc[group_id]['Condition Number'] = cond_number
     
