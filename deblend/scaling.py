@@ -62,8 +62,8 @@ def getRes(debl, listObjInBlob, listHSTObjInBlob, group_id=0,write_dir=None):
     if write_dir is None:
         return t,dic_spec,debl.cube,debl.estimatedCube,group_id,cond_number,xi2_tot
     else:
-        debl.cube.write(os.path.join(write_dir,"cube"+_+".fits"))
-        debl.estimatedCube.write(write_dir)
+        debl.cube.write(os.path.join(write_dir,"cube"+"_orig_%s"%(group_id) + ".fits"))
+        debl.estimatedCube.write(os.path.join(write_dir,"cube"+"_estim_%s"%(group_id) + ".fits"))
         return t,dic_spec,group_id,cond_number,xi2_tot
 
 
