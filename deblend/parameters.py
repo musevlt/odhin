@@ -73,6 +73,7 @@ class Params():
         
         ## minimal width of a group bounding box
         self.min_width = min_width
+        self.min_sky_pixels = min_sky_pixels
         
         # Misc
         self.nBands = nBands
