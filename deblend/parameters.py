@@ -39,7 +39,7 @@ class Params():
                  fsf_wavelength=7000, # mean wavelegnth to be used for grouping (where white MUSE image is used)
                  cut = 0.005, # absolute cut value for convolution during grouping
                  min_width = 6, # minimal width of a group bounding box
-                 min_sky_pixels = 20 # minimal number of sky pixels in a bounding box to estimate correctly the background
+                 min_sky_pixels = 20, # minimal number of sky pixels in a bounding box to estimate correctly the background
                  listFiltName=[DEFAULT_HSTFILTER606, # hst spectral filter response
                                DEFAULT_HSTFILTER775,
                                DEFAULT_HSTFILTER814,
