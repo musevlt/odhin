@@ -68,7 +68,7 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params, cut,ve
     for i,sk_region in enumerate(listRegions):
         region = getRegionAttr(sk_region) 
         blob_mask = (imLabel==i+1)
-        ensureMinimalBbox(region,params.min_width,imMUSE)
+        ensureMinimalBbox(region,params.min_width,imLabel,params.min_sky_pixels)
         bbox = region.bbox # order is row0,column0,row1,column1
         
         bboxHR = convertBboxToHR(bbox,segmap,imMUSE)
@@ -82,15 +82,32 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params, cut,ve
         
     return listGroups,imLabel
 
-def ensureMinimalBbox(region,width,im):
-    if region.area < width**2:
+def ensureMinimalBbox(region,width,imLabel,min_sky_pixels):
+    """
+    Ensures that region respects a minimal area and contains at least `min_sky_pixels` sky pixels 
+    """
+    if region.area < width**2: #first check minimal area
         bbox=[0,0,0,0]
         bbox[0] = int(np.maximum(region.centroid[0]-width//2,0))
         bbox[1] = int(np.maximum(region.centroid[1]-width//2,0))
-        bbox[2] = int(np.minimum(region.centroid[0]+width//2,im.shape[0]))
-        bbox[3] = int(np.minimum(region.centroid[1]+width//2,im.shape[1]))
+        bbox[2] = int(np.minimum(region.centroid[0]+width//2,imLabel.shape[0]))
+        bbox[3] = int(np.minimum(region.centroid[1]+width//2,imLabel.shape[1]))
         region.bbox=(bbox[0],bbox[1],bbox[2],bbox[3])
         region.area = (region.bbox[2]-region.bbox[0])*region.bbox[3]-region.bbox[1]
+        
+    nb_pixels = np.sum(imLabel[region.bbox[0]:region.bbox[2],region.bbox[1]:region.bbox[3]] == 0)
+    while nb_pixels < min_sky_pixels: # then check minimal number of sky pixels
+        width = width+1
+        bbox=[0,0,0,0]
+        bbox[0] = int(np.maximum(region.centroid[0]-width//2,0))
+        bbox[1] = int(np.maximum(region.centroid[1]-width//2,0))
+        bbox[2] = int(np.minimum(region.centroid[0]+width//2,imLabel.shape[0]))
+        bbox[3] = int(np.minimum(region.centroid[1]+width//2,imLabel.shape[1]))
+        nb_pixels = np.sum(imLabel[bbox[0]:bbox[2],bbox[1]:bbox[3]] == 0)
+        region.bbox=(bbox[0],bbox[1],bbox[2],bbox[3])
+        region.area = (region.bbox[2]-region.bbox[0])*region.bbox[3]-region.bbox[1]
+            
+    
 
 def getObjsInBlob(keys_cat, cat, sub_blob_mask, subimMUSE, subsegmap):
     """
