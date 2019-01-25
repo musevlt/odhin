@@ -37,6 +37,9 @@ class ODHIN():
         imMUSE (opt):
             
 
+        write_dir (opt):
+            if not None, results of each group is saved in this directory
+        
         Attributes
         ----------
         results
