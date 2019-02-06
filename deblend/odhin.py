@@ -35,8 +35,12 @@ class ODHIN():
         params : class with all parameters
             defined in module parameters
         imMUSE (opt):
-            
-
+            white image MUSE (if none created by summation on the cube)
+        imHST (opt):
+            reference HST image (if none the first of hstimages is taken)
+        main_kernel_transfert (opt):
+            kernel HST->MUSE to be used for preprocessing (grouping). 
+            If none provided build transfer kernel from default parameters
         write_dir (opt):
             if not None, results of each group is saved in this directory
         
