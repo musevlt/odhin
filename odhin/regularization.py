@@ -11,7 +11,7 @@ import scipy.stats as sst
 import itertools
 import sklearn.linear_model as sklm
 from scipy.ndimage.morphology import binary_dilation, grey_dilation
-
+from .lines_estimation import getLinesSupportList
 
 def glasso_bic(X, Y, ng=2, multivar=True, listMask=None,
                returnCriterion=False, greedy=True,
@@ -259,7 +259,7 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None, support=None
         # prefered method : gcv_spe
 
         alpha, rss = gridge_gcv_spectral(X_centr, Y_centr[:, k * ng:(
-               k + 1) * ng], alphas=alphas, Sig2=sig2[k * ng:(k + 1) * ng], support=support, oneSig=oneSig)
+               k + 1) * ng], alphas=alphas, Sig2=sig2[k * ng:(k + 1) * ng], support=support)
         listAlpha[k * ng:(k + 1) * ng] = alpha
         listRSS.append(rss.mean(axis=0).mean(axis=0))
         Ridge = sklm.Ridge(alpha=alpha, fit_intercept=True, normalize=True)

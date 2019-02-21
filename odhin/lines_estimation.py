@@ -1,3 +1,8 @@
+import numpy as np
+import scipy.stats as sst 
+import scipy.signal as ssl
+from scipy.ndimage.morphology import binary_dilation, grey_dilation
+
 def getLinesSupportList(
         listSpe,
         w=2,
