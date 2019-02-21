@@ -6,7 +6,7 @@ import os
 from mpdaf.obj import Cube, Image, Spectrum
 import numpy as np
 from .parameters import Params
-from .main_deblending import Deblending
+from .single_deblend import Deblending
 from .eval_utils import calcCondNumber,calcXi2_tot,calcXi2_source
 from astropy import table
 from .deblend_utils import extractHST

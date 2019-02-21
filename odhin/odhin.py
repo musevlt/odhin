@@ -82,12 +82,12 @@ class ODHIN():
         Segment all sources in a number of connected (at the MUSE resolution) groups
         and build a table of the groups
         """
-        if cut is None:
-            cut = self.params.cut
+        if cut is not None:
+            self.params.cut = cut
             
         self.groups,self.imLabel = doGrouping(self.cube,self.imHST,self.segmap, 
                                               self.imMUSE,self.cat,self.main_kernel_transfert,
-                                              cut=cut,params=self.params,verbose=verbose)
+                                              params=self.params,verbose=verbose)
         self.buildGroupTable()
 
     def deblend(self, listGroupToDeblend=None,cpu=None,verbose=True):
