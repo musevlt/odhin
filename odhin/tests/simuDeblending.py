@@ -224,31 +224,15 @@ class SimuDeblending:
              self.shapeHR[1]))
         for i in range(self.shapeHR[0]):
             for j in range(self.shapeHR[1]):
-                self.matrixPSF[max(0, i -
-                                   shapeFSF[0] //
-                                   2):min(self.shapeHR[0], i +
-                                          shapeFSF[0] //
-                                          2 +
-                                          1), max(0, j -
-                                                  shapeFSF[1] //
-                                                  2):min(self.shapeHR[1], j +
-                                                         shapeFSF[1] //
-                                                         2 +
-                                                         1), j +
-                               self.shapeHR[0] *
-                               i] = self.PSFMuse[int(max(0, shapeFSF[0] //
-                                                         2 -
-                                                         i)):int(min(shapeFSF[0], self.shapeHR[0] +
-                                                                     shapeFSF[0] *
-                                                                     1 /
-                                                                     2. -
-                                                                     i)), int(max(0, shapeFSF[1] //
-                                                                                  2 -
-                                                                                  j)):int(min(shapeFSF[1], self.shapeHR[1] +
-                                                                                              shapeFSF[1] *
-                                                                                              1 /
-                                                                                              2. -
-                                                                                              j))]
+                i_min = max(0, i - shapeFSF[0] // 2)
+                i_max = min(self.shapeHR[0], i + shapeFSF[0] // 2 + 1)
+                j_min = max(0, j - shapeFSF[1] // 2)
+                j_max = min(self.shapeHR[1], j + shapeFSF[1] // 2 + 1)
+                i_min_m = int(max(0, shapeFSF[0] // 2 - i))
+                i_max_m = int(min(shapeFSF[0], self.shapeHR[0] + shapeFSF[0] * 1 / 2. - i))
+                j_min_m = int(max(0, shapeFSF[1] //2 -j))
+                j_max_m = int(min(shapeFSF[1], self.shapeHR[1] +shapeFSF[1] *1 /2. -j))
+                self.matrixPSF[i_min:i_max, j_min:j_max, j + self.shapeHR[0] * i] = self.PSFMuse[i_min_m:i_max_m, j_min_m:j_max_m]
         self.matrixPSF = self.matrixPSF.reshape(
             (self.shapeHR[0] * self.shapeHR[1], self.shapeHR[0] * self.shapeHR[1]))
 

@@ -1,3 +1,15 @@
+1.0-beta2
+- Cleaning and refactor
+- Rename package to Odhin, change main_deblending to single_deblending and scaling to multi_deblend
+- Remove unused regularization
+- Add accessible parameter for deactivating regularization and for convolution cut
+- Normalize background spectrum by voxel
+
+---------
+1.0-beta1
+Add multiprocessing by groups
+
+------
 0.2 : add regularization
 
 -------
