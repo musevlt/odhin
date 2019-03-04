@@ -30,61 +30,58 @@ DEFAULT_HSTFILTER850 = os.path.join(
 class Params():
 
     def __init__(self,
-                 beta_hst=1.6, # Beta parameter for HST PSF Moffat model
-                 fwhm_hst=0.085, # FHWM parameter for HST PSF Moffat 
-                 nBands=10, # number of spectral blocks wherein MUSE FSF is considered constant
-                 fsf_a_muse = 0.869, # parameter "a" of MUSE FSF fwhm spectral evolution model : fhwm = a + b * lambda
-                 fsf_b_muse = -3.401e-05, # parameter "b" of MUSE FSF fwhm spectral evolution model : fhwm = a + b * lambda
-                 fsf_beta_muse = 2.8, #Beta parameter for MUSE FSF Moffat model
-                 fsf_wavelength=7000, # mean wavelegnth to be used for grouping (where white MUSE image is used)
-                 cut = 0.005, # absolute cut value for convolution during grouping
-                 alpha_cut = 0.999, # Get mask containing a fraction alpha_cut of total map intensity
-                 regul = True, # regularize deblending
-                 filt_w=101, #size of median filter for separating continuum from lines in regularization process
-                 min_width = 6, # minimal width of a group bounding box
-                 margin_bbox = 3, #additionnal margin in pixels around a ground bounding box
-                 min_sky_pixels = 20, # minimal number of sky pixels in a bounding box to estimate correctly the background
-                 listFiltName=[DEFAULT_HSTFILTER606, # hst spectral filter response
+                 beta_hst=1.6,  # Beta parameter for HST PSF Moffat model
+                 fwhm_hst=0.085,  # FHWM parameter for HST PSF Moffat
+                 nBands=10,  # number of spectral blocks wherein MUSE FSF is considered constant
+                 fsf_a_muse=0.869,  # parameter "a" of MUSE FSF fwhm spectral evolution model : fhwm = a + b * lambda
+                 fsf_b_muse=-3.401e-05,  # parameter "b" of MUSE FSF fwhm spectral evolution model : fhwm = a + b * lambda
+                 fsf_beta_muse=2.8,  # Beta parameter for MUSE FSF Moffat model
+                 fsf_wavelength=7000,  # mean wavelegnth to be used for grouping (where white MUSE image is used)
+                 cut=0.005,  # absolute cut value for convolution during grouping
+                 alpha_cut=0.999,  # Get mask containing a fraction alpha_cut of total map intensity
+                 regul=True,  # regularize deblending
+                 filt_w=101,  # size of median filter for separating continuum from lines in regularization process
+                 min_width=6,  # minimal width of a group bounding box
+                 margin_bbox=3,  # additionnal margin in pixels around a ground bounding box
+                 min_sky_pixels=20,  # minimal number of sky pixels in a bounding box to estimate correctly the background
+                 listFiltName=[DEFAULT_HSTFILTER606,  # hst spectral filter response
                                DEFAULT_HSTFILTER775,
                                DEFAULT_HSTFILTER814,
                                DEFAULT_HSTFILTER850],
                  ):
 
-        
-        
-
         # params for grouping objects
-        
-        ## first for convolution kernel
+
+        # first for convolution kernel
         self.fsf_a_muse = fsf_a_muse
         self.fsf_b_muse = fsf_b_muse
         self.fsf_beta_muse = fsf_beta_muse
-        
+
         self.fsf_wavelength = fsf_wavelength
-        
+
         self.beta_hst = beta_hst
         self.fwhm_hst = fwhm_hst
-        
-        ## computed values
-        self.fwhm_muse = fsf_a_muse + fsf_b_muse*fsf_wavelength 
-        
-        ### expressed in MUSE pixels
+
+        # computed values
+        self.fwhm_muse = fsf_a_muse + fsf_b_muse * fsf_wavelength
+
+        # expressed in MUSE pixels
         self.alpha_hst = np.sqrt((self.fwhm_hst / 0.2 * 15)
-                                ** 2 / (4 * (2**(1 / self.beta_hst) - 1)))
-        
-        ## then for cutting the convolution
+                                 ** 2 / (4 * (2**(1 / self.beta_hst) - 1)))
+
+        # then for cutting the convolution
         self.cut = cut
-        
-        ## minimal width of a group bounding box
+
+        # minimal width of a group bounding box
         self.min_width = min_width
         self.min_sky_pixels = min_sky_pixels
         self.margin_bbox = margin_bbox
-        
+
         # Misc
         self.nBands = nBands
         self.listFiltName = listFiltName
-        
-        ## Deblending
+
+        # Deblending
         self.alpha_cut = alpha_cut
         self.regul = regul
         self.filt_w = filt_w

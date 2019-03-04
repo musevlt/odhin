@@ -4,14 +4,11 @@
 @author: raphael.bacher@gipsa-lab.fr
 """
 
+import itertools
 import numpy as np
 
-import scipy.signal as ssl
-import scipy.stats as sst
-import itertools
-import sklearn.linear_model as sklm
-from scipy.ndimage.morphology import binary_dilation, grey_dilation
 from .lines_estimation import getLinesSupportList
+
 
 def glasso_bic(X, Y, ng=2, multivar=True, listMask=None,
                returnCriterion=False, greedy=True,
@@ -217,7 +214,6 @@ def lasso_bic(
     return coeff, intercepts, np.concatenate([np.array([r0]), criterion_])
 
 
-
 def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None, support=None):
     """
 
@@ -232,7 +228,7 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None, support=None
         Y : data (n x lmbda)
         ng : size of spectral blocks
         alphas : list of regul parameters to test
-       
+
         sig2 : variance of each wavelength slice
         support : mask of samples (pixels) with enough signal, where the cross validation will be applied
 
@@ -242,6 +238,7 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None, support=None
         intercepts : background (1 x lmbda)
     """
 
+    import sklearn.linear_model as sklm
     coeff = np.zeros((X.shape[1], Y.shape[1]))
     intercepts = np.zeros((1, Y.shape[1]))
     RCV_slid = sklm.RidgeCV(alphas=alphas, fit_intercept=True, normalize=True,
@@ -259,7 +256,7 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None, support=None
         # prefered method : gcv_spe
 
         alpha, rss = gridge_gcv_spectral(X_centr, Y_centr[:, k * ng:(
-               k + 1) * ng], alphas=alphas, Sig2=sig2[k * ng:(k + 1) * ng], support=support)
+            k + 1) * ng], alphas=alphas, Sig2=sig2[k * ng:(k + 1) * ng], support=support)
         listAlpha[k * ng:(k + 1) * ng] = alpha
         listRSS.append(rss.mean(axis=0).mean(axis=0))
         Ridge = sklm.Ridge(alpha=alpha, fit_intercept=True, normalize=True)
@@ -295,7 +292,7 @@ def gridge_gcv_spectral(X,
             list of regul parameters to test
         Sig2 :
             variance of each wavelength slice (1d array n_targets)
-        
+
         maxAlphaFrac : float
             fraction of the max singular value of X that will be the
             upper limit for regularization parameter
@@ -321,11 +318,10 @@ def gridge_gcv_spectral(X,
         # GCV approx S_ii =Tr(S)/n
         TrS = np.sum(sval**2 / (sval**2 + alpha))
         residuals = np.sum(((alpha / (sval**2 + alpha))**2)
-                               [:, None] * UtY2, axis=0)
-            
+                           [:, None] * UtY2, axis=0)
+
         rss[:, a] = residuals / (1 - TrS / Xs.shape[0])**2
 
-    
     alpha = alphas[np.argmin(np.average(rss, axis=0, weights=1 / Sig2))]
     TrS = np.sum(sval**2 / (sval**2 + alpha))
     Xbeta = np.dot(U, _diag_dot(sval**2 / (sval**2 + alpha), UtY))
@@ -334,7 +330,7 @@ def gridge_gcv_spectral(X,
     min_mse_std = np.std(np.std(rss_alpha, axis=0), axis=0) / np.sqrt(cv)
     min_mse = np.mean(np.mean(rss_alpha, axis=0), axis=0)
     alpha = np.max([alphas[i] for i in range(len(alphas))
-                        if np.mean(rss[:, i]) < min_mse + min_mse_std])
+                    if np.mean(rss[:, i]) < min_mse + min_mse_std])
     if alpha > np.max(sval) * maxAlphaFrac:
         alpha = np.max(sval) * maxAlphaFrac
 
@@ -403,7 +399,7 @@ def regulDeblendFunc(X,
             method to use for emission lines estimation
         ng : int
             size of spectral bin for regularization
-        
+
 
     Output:
     ------
@@ -461,10 +457,10 @@ def regulDeblendFunc(X,
     # we now work on remaining data Y_c
     X1 = X[support, :]
     Y_c1 = Y_c[support, :]
-    
+
     # preferred method : sliding Ridge GCV
     c_coeff, c_intercepts, c_alphas, listRSS = gridge_cv(
-            X, Y_c, ng=ng, support=support, sig2=Y_sig2, alphas=alphas)
+        X, Y_c, ng=ng, support=support, sig2=Y_sig2, alphas=alphas)
 
     # correct flux
     # add one row of ones for background/intercept to keep corresponding
@@ -480,7 +476,7 @@ def regulDeblendFunc(X,
     intercepts = c_intercepts + l_intercepts
 
     return res, intercepts, listMask, c_coeff, l_coeff, Y, Y_l, Y_c, c_alphas, listRSS, listA
-    
+
 
 def corrFlux(X, Y, beta):
     """

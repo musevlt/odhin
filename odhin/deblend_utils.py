@@ -6,16 +6,11 @@
 
 import numpy as np
 import scipy.signal as ssl
-from numpy import ma
-from scipy.ndimage.filters import convolve
-import scipy.optimize as so
 from scipy.interpolate import interp1d
 import astropy.units as units
-import astropy.io.fits as pyfits
 import math
 from scipy import ndimage
-from photutils import create_matching_kernel, CosineBellWindow, TopHatWindow, SegmentationImage
-from skimage.measure import regionprops, label
+from photutils import create_matching_kernel, TopHatWindow, SegmentationImage
 
 
 def block_sum(ar, fact):
@@ -438,7 +433,8 @@ def getBlurKernel(imHR, imLR, sizeKer, returnImBlurred=False, cut=0.00001):
 
     return kernel
 
-def _getLabel( segmap=None):
+
+def _getLabel(segmap=None):
     """
     Create a new segmap with contiguous indices
     """
@@ -450,15 +446,16 @@ def _getLabel( segmap=None):
 
     return label_image
 
-def calcMainKernelTransfert(params,imHST):
+
+def calcMainKernelTransfert(params, imHST):
     """
     Build transfert kernel between an HR kernel and LR kernel (defined in paramaters)
     """
-    # get parameters 
+    # get parameters
     fsf_beta_muse = params.fsf_beta_muse
     fwhm_muse = params.fwhm_muse
-    fwhm_hst=params.fwhm_hst
-    beta_hst=params.beta_hst
+    fwhm_hst = params.fwhm_hst
+    beta_hst = params.beta_hst
 
     hst = imHST
 
@@ -480,7 +477,6 @@ def calcMainKernelTransfert(params,imHST):
     psf_hst = 1.0 / (1.0 + rsq / asq_hst)**beta_hst
     psf_hst = psf_hst / np.sum(psf_hst)
 
-
     # Build MUSE FSF
     asq = fwhm_muse**2 / 4.0 / (2.0**(1.0 / fsf_beta_muse) - 1.0)
     im_muse = 1.0 / (1.0 + rsq / asq)**fsf_beta_muse
@@ -488,7 +484,8 @@ def calcMainKernelTransfert(params,imHST):
 
     return getBlurKernel(imHR=psf_hst, imLR=im_muse, sizeKer=(21, 21))
 
-def createIntensityMap(imHR, segmap, imLR, kernel_transfert,params=None):
+
+def createIntensityMap(imHR, segmap, imLR, kernel_transfert, params=None):
     """
     Create intensity maps from HST images and segmentation map.
 
@@ -503,16 +500,16 @@ def createIntensityMap(imHR, segmap, imLR, kernel_transfert,params=None):
     """
     if params is None:
         params = Params()
-    
+
     # create image of label reindexed squentially from 0 to nSources
-    segmapIm = SegmentationImage(segmap.data) 
+    segmapIm = SegmentationImage(segmap.data)
     segmapIm.relabel_sequential()
     labelHR = segmapIm.data
-    
+
     intensityMapHR = np.zeros(imHR.shape)
     intensityMapHR[labelHR > 0] = np.maximum(
         imHR.data[segmap.data > 0], 10**(-9))  # avoid negative abundances
-    
+
     intensityMapLRConvol = convertIntensityMap(
         intensityMapHR[None, :],
         imLR,
@@ -533,32 +530,34 @@ def modifSegmap(segmap, cat):
     keys = np.unique(segmap.data.data)
     for k in keys:
         if k not in keys_cat:
-            ##### to log somewhere
-            #print(k)
+            # to log somewhere
+            # print(k)
             ####
             segmap2.data[segmap.data == k] = 0
     return segmap2
+
 
 def get_cat_from_segmap(segmap):
     """
     Get IDs and center directly from a segmap (thus removing the need for an external catalag)
     """
-    ## To be build
+    # To be build
     pass
+
 
 def extractHST(imHST, imMUSE, rot=True):
     """
     extract HST image corresping to MUSE image
     """
-    center = imMUSE.wcs.pix2sky((imMUSE.shape[0]//2, imMUSE.shape[1]//2))[0]
+    center = imMUSE.wcs.pix2sky((imMUSE.shape[0] // 2, imMUSE.shape[1] // 2))[0]
     step = imMUSE.get_step(units.Unit("arcsec"))
     stepHST = imHST.get_step(units.Unit("arcsec"))
-    size = (step[1]*imMUSE.shape[1], step[0] *
+    size = (step[1] * imMUSE.shape[1], step[0] *
             imMUSE.shape[0])  # width then height
     # size[0] is width so second dimension of the array
-    sizeHST = (size[0]/stepHST[1], size[1]/stepHST[0])
-    ext_size = (size[1]+10, size[0]+10)
-    ext_sizeHST = (ext_size[0]/stepHST[1], ext_size[1]/stepHST[0])
+    sizeHST = (size[0] / stepHST[1], size[1] / stepHST[0])
+    ext_size = (size[1] + 10, size[0] + 10)
+    ext_sizeHST = (ext_size[0] / stepHST[1], ext_size[1] / stepHST[0])
     centerHST = imHST.wcs.sky2pix(center, nearest=True)[0]
     if rot is True:
         imHST_tmp = imHST.subimage(center, ext_sizeHST, unit_size=None)

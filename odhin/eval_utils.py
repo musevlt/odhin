@@ -11,7 +11,7 @@ import numpy as np
 import scipy.signal as ssl
 
 
-def calcCondNumber(debl,listobj=None):
+def calcCondNumber(debl, listobj=None):
     """
     Compute condition number on a odhin object
     """
@@ -24,14 +24,17 @@ def calcCondNumber(debl,listobj=None):
     cond = np.linalg.cond(mat)
     return cond
 
+
 def calcXi2_tot(debl):
-    xi2 = 1/(np.size(debl.residuals)-3)*np.sum(debl.residuals**2/debl.cubeLRVar)
+    xi2 = 1 / (np.size(debl.residuals) - 3) * np.sum(debl.residuals**2 / debl.cubeLRVar)
     return xi2
 
-def calcXi2_source(debl,k):
-    mask = debl.listIntensityMapLRConvol[0][0][k].reshape(debl.shapeLR)>0
-    xi2 = 1/(np.size(debl.residuals[:,mask])-3)*np.sum(debl.residuals[:,mask]**2/debl.cubeLRVar[:,mask])
+
+def calcXi2_source(debl, k):
+    mask = debl.listIntensityMapLRConvol[0][0][k].reshape(debl.shapeLR) > 0
+    xi2 = 1 / (np.size(debl.residuals[:, mask]) - 3) * np.sum(debl.residuals[:, mask]**2 / debl.cubeLRVar[:, mask])
     return xi2
+
 
 def calcCondNumber2(mat):
     for col in mat:
