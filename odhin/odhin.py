@@ -169,16 +169,13 @@ class ODHIN():
         self.results['Spectra'] = self.dict_spec
 
     def buildGroupTable(self):
-        self.table_groups = Table(
-            names=('G_ID', 'nbSources', 'listIDs', 'Area', 'Xi2',
-                   'Condition Number'),
-            dtype=(int, int, tuple, float, float, float)
-        )
-        for i, group in enumerate(self.groups):
-            self.table_groups.add_row(
-                [i, group.nbSources, tuple(group.listSources),
-                 group.region.area, 0, 0])
-
+        names = ('G_ID', 'nbSources', 'listIDs', 'Area', 'Xi2',
+                 'Condition Number')
+        groups = [[i, group.nbSources, tuple(group.listSources),
+                   group.region.area, 0, 0]
+                  for i, group in enumerate(self.groups)]
+        self.table_groups = Table(names=names, rows=groups,
+                                  dtype=(int, int, tuple, float, float, float))
         self.table_groups.add_index('G_ID')
 
     # Plotting functions
