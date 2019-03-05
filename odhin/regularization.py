@@ -10,29 +10,30 @@ import numpy as np
 from .lines_estimation import getLinesSupportList
 
 
-def glasso_bic(X, Y, ng=2, multivar=True, listMask=None,
-               returnCriterion=False, greedy=True,
-               averaged=True):
+def glasso_bic(X, Y, ng=2, multivar=True, listMask=None, returnCriterion=False,
+               greedy=True, averaged=True):
     """
     If given listMask, on each mask do a BIC selection (cf lasso_bic)
 
     Parameters
     ----------
-        X : regressors (intensityMaps, n x k)
-        Y : data (n x lmbda)
-        ng : size of spectral blocks
-        multivar : if True, in BIC selection consider different variance for each wavelength (useless if averaged is True)
-        listMask : list of lines mask. The regularization is done independently on each of these masks
-        returnCriterion : return values of BIC criterion
-        greedy : if True use greedy approximation of BIC
-        averaged : if True do the BIC selection on averaged data (before doing the regression on original data)
-
+    X : regressors (intensityMaps, n x k)
+    Y : data (n x lmbda)
+    ng : size of spectral blocks
+    multivar : if True, in BIC selection consider different variance for each
+    wavelength (useless if averaged is True)
+    listMask : list of lines mask. The regularization is done independently
+    on each of these masks
+    returnCriterion : return values of BIC criterion
+    greedy : if True use greedy approximation of BIC
+    averaged : if True do the BIC selection on averaged data (before doing
+    the regression on original data)
 
     Output:
     ------
-        coeff : estimated coefficients (spectra k x lmbda)
-        intercepts : background (1 x lmbda)
-        (criterion : list of BIC values)
+    coeff : estimated coefficients (spectra k x lmbda)
+    intercepts : background (1 x lmbda)
+    (criterion : list of BIC values)
 
     """
     coeff = np.zeros((X.shape[1], Y.shape[1]))
@@ -40,12 +41,8 @@ def glasso_bic(X, Y, ng=2, multivar=True, listMask=None,
     intercepts = np.zeros((1, Y.shape[1]))
     if listMask is None:
         for k in range(Y.shape[1]):
-            res = lasso_bic(X,
-                            Y[:,
-                              np.maximum(0,
-                                         k - ng):k + ng + 1],
-                            multivar=multivar,
-                            averaged=averaged,
+            res = lasso_bic(X, Y[:, np.maximum(0, k - ng):k + ng + 1],
+                            multivar=multivar, averaged=averaged,
                             greedy=greedy)
             coeff[:, k] = res[0][:, np.minimum(k, ng)]
             intercepts[:, k] = res[1][np.minimum(k, ng)]
@@ -63,43 +60,38 @@ def glasso_bic(X, Y, ng=2, multivar=True, listMask=None,
     return coeff, intercepts
 
 
-def lasso_bic(
-        X,
-        Y,
-        multivar=True,
-        greedy=False,
-        averaged=True,
-        returnAll=False):
-    """
+def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
+              returnAll=False):
+    r"""
     Estimate spectra from X, Y using BIC.
 
-    BIC  is defined as  K\log(n) -2\log(\hat{L}) with K the number of free parameters,
-    n the number of samples and L the likelihood.
+    BIC  is defined as  K\log(n) -2\log(\hat{L}) with K the number of free
+    parameters, n the number of samples and L the likelihood.
 
-    Here BIC = (k+1)\log(n) + \log(\widehat{\sigma}^2) where sigma^2 is the variance of
-    the residuals.
+    Here BIC = (k+1)\log(n) + \log(\widehat{\sigma}^2) where sigma^2 is the
+    variance of the residuals.
 
-    So for each possible model (=combination of a selection of spectra/objects/regressors)
-    we compute the regression (least square inversion), the number of free paramaters
-    and the residuals. From that we get the BIC value associated with this
+    So for each possible model (=combination of a selection of
+    spectra/objects/regressors) we compute the regression (least square
+    inversion), the number of free paramaters and the residuals. From that we
+    get the BIC value associated with this
 
     Parameters
     ----------
-        X : regressors (intensityMaps, n x k)
-        Y : data (n x lmbda)
-        multivar : if True, in BIC selection consider different variance for each wavelength (useless if averaged is True)
-        greedy : if True use greedy approximation of BIC
-        averaged : if True do the BIC selection on averaged data (before doing the regression on original data)
-
-
+    X : regressors (intensityMaps, n x k)
+    Y : data (n x lmbda)
+    multivar : if True, in BIC selection consider different variance for
+    each wavelength (useless if averaged is True)
+    greedy : if True use greedy approximation of BIC
+    averaged : if True do the BIC selection on averaged data (before doing
+    the regression on original data)
 
     Output:
     ------
-        coeff : estimated coefficients (=spectra k x lmbda)
-        intercepts : background (1 x lmbda)
+    coeff : estimated coefficients (=spectra k x lmbda)
+    intercepts : background (1 x lmbda)
 
     """
-
     if averaged:  # work on averaged data for model selection
         Y_all = Y.copy()
         Y = np.mean(Y, axis=1)[:, None]
@@ -111,12 +103,15 @@ def lasso_bic(
     if returnAll:
         coef_path_all = []
     listComb = []
-    if greedy == False:  # compute all possible combinations of non-nul objects
+
+    if not greedy:
+        # compute all possible combinations of non-nul objects
         for k in range(1, n_models + 1):
-            listComb += [
-                i for i in itertools.combinations(
-                    np.arange(n_models), k)]
-    else:  # add iteratively the regressor the most strongly correlated to the data in the remaining regressors
+            listComb += [i for i in itertools.combinations(
+                np.arange(n_models), k)]
+    else:
+        # add iteratively the regressor the most strongly correlated to the
+        # data in the remaining regressors
         listComb = [[]]
         listModels = list(range(n_models))
         lprod = [np.mean(np.dot(X[:, i], Y)) for i in listModels]
@@ -185,11 +180,12 @@ def lasso_bic(
     r0 = r0 + n_targets * K
 
     if returnAll:
-        likelihood = np.concatenate([np.array([n_samples *
-                                               np.sum(np.log(np.mean(Y**2, axis=0)))]), n_samples *
-                                     np.sum(np.log(mean_squared_error), axis=1)])
-        penalty = np.concatenate(
-            [np.array([r0 - n_samples * np.sum(np.log(np.mean(Y**2, axis=0)))]), K * df])
+        likelihood = np.concatenate([
+            np.array([n_samples * np.sum(np.log(np.mean(Y**2, axis=0)))]),
+            n_samples * np.sum(np.log(mean_squared_error), axis=1)])
+        penalty = np.concatenate([
+            np.array([r0 - n_samples * np.sum(np.log(np.mean(Y**2, axis=0)))]),
+            K * df])
 
     if averaged:  # we now get back to the whole dataset
         Y = Y_all
@@ -214,33 +210,36 @@ def lasso_bic(
     return coeff, intercepts, np.concatenate([np.array([r0]), criterion_])
 
 
-def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None, support=None):
+def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None,
+              support=None):
     """
-
     Estimate coefficients using ridge regression and various methods for
     regularization parameter estimation.
+
     Use the 'one sigma' rule to increase regularization efficiency
-    Use gridge_gcv_spectral method for the estimation of regularization parameter
+    Use gridge_gcv_spectral method for the estimation of regularization
+    parameter
 
     Parameters
     ----------
-        X : regressors (intensityMaps, n x k)
-        Y : data (n x lmbda)
-        ng : size of spectral blocks
-        alphas : list of regul parameters to test
-
-        sig2 : variance of each wavelength slice
-        support : mask of samples (pixels) with enough signal, where the cross validation will be applied
+    X : regressors (intensityMaps, n x k)
+    Y : data (n x lmbda)
+    ng : size of spectral blocks
+    alphas : list of regul parameters to test
+    sig2 : variance of each wavelength slice
+    support : mask of samples (pixels) with enough signal, where the cross
+    validation will be applied
 
     Output:
     ------
-        coeff : estimated coefficients (spectra k x lmbda)
-        intercepts : background (1 x lmbda)
-    """
+    coeff : estimated coefficients (spectra k x lmbda)
+    intercepts : background (1 x lmbda)
 
+    """
     import sklearn.linear_model as sklm
     coeff = np.zeros((X.shape[1], Y.shape[1]))
     intercepts = np.zeros((1, Y.shape[1]))
+    # FIXME: not used, remove ?
     RCV_slid = sklm.RidgeCV(alphas=alphas, fit_intercept=True, normalize=True,
                             store_cv_values=True)
     listAlpha = np.zeros((Y.shape[1]))
@@ -251,12 +250,12 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None, support=None
 
     for x in range(X_centr.shape[1]):
         X_centr[:, x] = X_centr[:, x] / np.linalg.norm(X_centr[:, x])
+
     for k in range(int(np.ceil(Y.shape[1] / float(ng)))):
-
         # prefered method : gcv_spe
-
-        alpha, rss = gridge_gcv_spectral(X_centr, Y_centr[:, k * ng:(
-            k + 1) * ng], alphas=alphas, Sig2=sig2[k * ng:(k + 1) * ng], support=support)
+        alpha, rss = gridge_gcv_spectral(
+            X_centr, Y_centr[:, k * ng:(k + 1) * ng], alphas=alphas,
+            Sig2=sig2[k * ng:(k + 1) * ng], support=support)
         listAlpha[k * ng:(k + 1) * ng] = alpha
         listRSS.append(rss.mean(axis=0).mean(axis=0))
         Ridge = sklm.Ridge(alpha=alpha, fit_intercept=True, normalize=True)
@@ -267,47 +266,41 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None, support=None
     return coeff, intercepts, listAlpha, listRSS
 
 
-def gridge_gcv_spectral(X,
-                        Y,
-                        support,
-                        alphas=np.logspace(-5,
-                                           2,
-                                           50),
-                        Sig2=None,
-                        maxAlphaFrac=2.):
+def gridge_gcv_spectral(X, Y, support, alphas=np.logspace(-5, 2, 50),
+                        Sig2=None, maxAlphaFrac=2.):
     """
-
     Estimate coefficients using ridge regression and various methods for
     regularization parameter estimation
 
     Parameters
     ----------
-        X : 2d array (n pixels  x  k objects)
-            regressors (intensityMaps)
-        Y : 2d array (n pixels  x lmbda wavelengths)
-            data
-        support : 1d array of bool
-            mask of samples (pixels) with enough signal, where the cross validation will be applied
-        alphas : list of float
-            list of regul parameters to test
-        Sig2 :
-            variance of each wavelength slice (1d array n_targets)
-
-        maxAlphaFrac : float
-            fraction of the max singular value of X that will be the
-            upper limit for regularization parameter
+    X : 2d array (n pixels  x  k objects)
+        regressors (intensityMaps)
+    Y : 2d array (n pixels  x lmbda wavelengths)
+        data
+    support : 1d array of bool
+        mask of samples (pixels) with enough signal, where the cross
+        validation will be applied
+    alphas : list of float
+        list of regul parameters to test
+    Sig2 :
+        variance of each wavelength slice (1d array n_targets)
+    maxAlphaFrac : float
+        fraction of the max singular value of X that will be the
+        upper limit for regularization parameter
 
     Output:
     ------
-        alpha : estimated regularization parameter
-        rss : errors of prediction (ndarray n_targets,n_alphas)
-    """
+    alpha : estimated regularization parameter
+    rss : errors of prediction (ndarray n_targets,n_alphas)
 
+    """
     Ys = Y[support]
     Xs = X[support]
     if Sig2 is None:
         Sig2 = np.ones(Y.shape[1])
 
+    # FIXME: not used, remove ?
     sumSig2 = Sig2[:-2] + Sig2[2:]
     U, sval, V = np.linalg.svd(Xs, full_matrices=False)
     UtY = np.dot(U.T, Ys)
@@ -368,38 +361,25 @@ def medfilt(x, k):
     return np.median(y, axis=1)
 
 
-def regulDeblendFunc(X,
-                     Y,
-                     Y_c=None,
-                     ng=200,
-                     n_alphas=100,
-                     eps=1e-3,
-                     alpha_c=0.0001,
-                     support=None,
-                     trueLines=None,
-                     alphas=np.logspace(-5,
-                                        2,
-                                        50),
-                     filt_w=101,
-                     Y_sig2=None):
+def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
+                     alpha_c=0.0001, support=None, trueLines=None,
+                     alphas=np.logspace(-5, 2, 50), filt_w=101, Y_sig2=None):
     """
-
     Estimate coefficients using ridge regression and various methods for
     regularization parameter estimation
 
     Parameters
     ----------
-        X : 2d array (n pixels  x  k objects)
-            regressors (intensityMaps)
-        Y : 2d array (n pixels  x lmbda wavelengths)
-            data
-        Y_c : 2d array (n pixels  x lmbda wavelengths)
-            data continuum (if pre-estimated)
-        l_method : str
-            method to use for emission lines estimation
-        ng : int
-            size of spectral bin for regularization
-
+    X : 2d array (n pixels  x  k objects)
+        regressors (intensityMaps)
+    Y : 2d array (n pixels  x lmbda wavelengths)
+        data
+    Y_c : 2d array (n pixels  x lmbda wavelengths)
+        data continuum (if pre-estimated)
+    l_method : str
+        method to use for emission lines estimation
+    ng : int
+        size of spectral bin for regularization
 
     Output:
     ------
@@ -439,14 +419,8 @@ def regulDeblendFunc(X,
             listSpe.append(np.dot(X[:, i:i + 1].T, Y_l)[0])
 
         # Then we seek all spectral lines on this bunch of spectra
-        listMask = getLinesSupportList(
-            listSpe,
-            w=2,
-            wmax=20,
-            wmin=2,
-            alpha=2.5,
-            n_sig=1.4,
-            filt=None)
+        listMask = getLinesSupportList(listSpe, w=2, wmax=20, wmin=2,
+                                       alpha=2.5, n_sig=1.4, filt=None)
 
     # preferred approach : group bic approach
     l_coeff, l_intercepts = glasso_bic(X, Y_l, ng=ng, listMask=listMask)
@@ -455,6 +429,7 @@ def regulDeblendFunc(X,
     Y_c = Y - np.dot(X, l_coeff) - l_intercepts
 
     # we now work on remaining data Y_c
+    # FIXME: not used, remove ?
     X1 = X[support, :]
     Y_c1 = Y_c[support, :]
 
@@ -475,7 +450,8 @@ def regulDeblendFunc(X,
     res = c_coeff + l_coeff
     intercepts = c_intercepts + l_intercepts
 
-    return res, intercepts, listMask, c_coeff, l_coeff, Y, Y_l, Y_c, c_alphas, listRSS, listA
+    return (res, intercepts, listMask, c_coeff, l_coeff, Y, Y_l, Y_c,
+            c_alphas, listRSS, listA)
 
 
 def corrFlux(X, Y, beta):

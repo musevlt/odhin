@@ -4,18 +4,9 @@ import scipy.signal as ssl
 from scipy.ndimage.morphology import grey_dilation
 
 
-def getLinesSupportList(
-        listSpe,
-        w=2,
-        wmin=1,
-        wmax=20,
-        alpha=1.4,
-        beta=1.2,
-        n_sig=1.2,
-        f=0.6,
-        returnAll=False,
-        filt=None,
-        localConstraint=True):
+def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
+                        n_sig=1.2, f=0.6, returnAll=False, filt=None,
+                        localConstraint=True):
     """
     Get emission/absorption lines spectral support
 
@@ -36,18 +27,16 @@ def getLinesSupportList(
         Stop line spectral support where signal is lower than beta*sig.
     n_sig: float
         A half-width corresponds to n_sig standard deviations of the kernel.
-
     f: float
-        to avoid too many overlapping masks : if already covered at more than a fraction f by an existing
-        mask don't add current mask
+        to avoid too many overlapping masks : if already covered at more than
+        a fraction f by an existing mask don't add current mask
     returnAll : bool
         return all intermediate results
     filt: 1d-array (None by default)
         pattern for matching filter (gaussian shape will be made by default)
     localConstraint : bool
-        if True, reject peaks where immediate neighbors of extrema are not > 1 std
-        (maxima) or < -1 std (minima).
-
+        if True, reject peaks where immediate neighbors of extrema are not
+        > 1 std (maxima) or < -1 std (minima).
 
     Output:
     ------
@@ -151,7 +140,6 @@ def genKernels(listWidth=np.arange(5, 42, 2), n=41, n_sig=2):
         length of a kernel 1d-array
     n_sig: float
          A half-width corresponds to n_sig standard deviations.
-
 
     Output
     ----------

@@ -3,14 +3,14 @@
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-
-import numpy as np
-from scipy.signal import fftconvolve
-from scipy.interpolate import interp1d
 import astropy.units as u
 import math
-from scipy import ndimage
+import numpy as np
+
 from photutils import create_matching_kernel, TopHatWindow, SegmentationImage
+from scipy import ndimage
+from scipy.interpolate import interp1d
+from scipy.signal import fftconvolve
 
 
 def get_fig_ax(ax=None):

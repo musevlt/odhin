@@ -3,10 +3,11 @@
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-from mpdaf.obj import Spectrum
 import scipy.signal as ssl
 import numpy as np
 import astropy.units as units
+from mpdaf.obj import Spectrum
+
 from .regularization import regulDeblendFunc, medfilt
 from .parameters import Params
 from .deblend_utils import (convertFilt, _getLabel, convertIntensityMap,
@@ -17,25 +18,20 @@ class Deblending():
     """
     Main class for deblending process
 
-
     Parameters
     ----------
     cube : mpdaf Cube
         The mpdaf Cube object to be deblended
     HSTimages:
         HST mpdaf images
-
     listFiltName : list of filenames
         list of filenames of HST response filters.
     nbands : int
         The number of MUSE spectral bins to consider for computation.
         MUSE FSF is assumed constant within a bin.
 
-
-
     Attributes
     ----------
-
     estimatedCube : numpy.ndarray
         Estimated cube
     estimatedCubeCont : numpy.ndarray
@@ -50,8 +46,6 @@ class Deblending():
         list of Abundance Map of each object detected, at high resolution,
         and after convolution and subsampling
 
-
-
     """
 
     def __init__(self, cube, HSTImages, params=None):
@@ -61,15 +55,11 @@ class Deblending():
             params = Params()
         self.params = params
         self.HSTImages = HSTImages
-        self.cubeLR = cube.data.filled(
-            np.ma.median(cube.data))
-
-        self.cubeLRVar = cube.var.filled(
-            np.ma.median(cube.var))
+        self.cubeLR = cube.data.filled(np.ma.median(cube.data))
+        self.cubeLRVar = cube.var.filled(np.ma.median(cube.var))
         self.wcs = cube.wcs
         self.wave = cube.wave
-        self.listImagesHR = [
-            hst for hst in HSTImages]
+        self.listImagesHR = [hst for hst in HSTImages]
         l_min, l_max = cube.wave.get_range()
 
         # get FSF parameters
@@ -78,31 +68,29 @@ class Deblending():
         self.fsf_beta_muse = self.params.fsf_beta_muse
 
         self.nBands = self.params.nBands
-        self.listFWHM = [self.fsf_a + self.fsf_b * (l + (l_min - l_max) / self.nBands)
+        dl = (l_min - l_max) / self.nBands
+        self.listFWHM = [self.fsf_a + self.fsf_b * (l + dl)
                          for l in np.linspace(l_min, l_max, self.nBands)]
 
         if self.params.listFiltName is not None:
-            self.filtResp = [
-                convertFilt(
-                    np.loadtxt(filtName),
-                    self.wave) for filtName in self.params.listFiltName]
+            self.filtResp = [convertFilt(np.loadtxt(filtName), self.wave)
+                             for filtName in self.params.listFiltName]
         else:
             self.filtResp = [np.ones(self.cubeLR.shape[0])] * 4
 
         # needeed for muse_analysis functions
+        filters = ['f606w', 'f775w', 'f814w', 'f850lp']
         for k, im in enumerate(self.listImagesHR):
-            im.primary_header['FILTER'] = [
-                'f606w', 'f775w', 'f814w', 'f850lp'][k]
+            im.primary_header['FILTER'] = filters[k]
 
         self.shapeHR = self.listImagesHR[0].shape
         self.shapeLR = self.cubeLR[0].shape
-        self.residuals = np.zeros(
-            (self.cubeLR.shape[0],
-             self.cubeLR.shape[1] *
-             self.cubeLR.shape[2]))
+        self.residuals = np.zeros((self.cubeLR.shape[0],
+                                   self.cubeLR.shape[1] *
+                                   self.cubeLR.shape[2]))
         self.estimatedCube = self.cube.clone()
-        self.PSF_HST = generatePSF_HST(
-            self.params.alpha_hst, self.params.beta_hst)
+        self.PSF_HST = generatePSF_HST(self.params.alpha_hst,
+                                       self.params.beta_hst)
 
         # for each HST band list all MUSE bands inside it
         self.listBands = self._getListBands(self.nBands, self.filtResp)
@@ -116,7 +104,8 @@ class Deblending():
         for i in range(len(filtResp)):
             listBands.append([])
             for j in range(nBands):
-                if (filtResp[i][j * lmbda // nBands] != 0) or (filtResp[i][np.minimum((j + 1) * lmbda // nBands, lmbda - 1)] != 0):
+                if (filtResp[i][j * lmbda // nBands] != 0) or (
+                        filtResp[i][np.minimum((j + 1) * lmbda // nBands, lmbda - 1)] != 0):
                     listBands[i].append(j)
         return listBands
 
@@ -160,8 +149,9 @@ class Deblending():
             intensityMapHR[0] = 1.
 
             for k in range(1, np.max(self.labelHR) + 1):
+                # avoid negative abundances
                 mask[self.labelHR == k] = np.maximum(
-                    self.listImagesHR[j].data[self.labelHR == k], 10**(-9))  # avoid negative abundances
+                    self.listImagesHR[j].data[self.labelHR == k], 10**(-9))
                 intensityMapHR[k] = mask.copy().flatten()
                 mask[:] = 0
 
@@ -178,8 +168,11 @@ class Deblending():
         if regul:
             # precompute continuum
             shape = self.cubeLR.shape
-            self.cubeLR_c = np.vstack([medfilt(y, filt_w) for y in self.cubeLR.reshape(
-                shape[0], shape[1] * shape[2]).T]).T.reshape(shape)
+            self.cubeLR_c = np.vstack([
+                medfilt(y, filt_w)
+                for y in self.cubeLR.reshape(
+                    shape[0], shape[1] * shape[2]).T
+            ]).T.reshape(shape)
 
         # compute HST-MUSE transfer functions for all MUSE FSF fwhm
         # considered
@@ -248,7 +241,8 @@ class Deblending():
                         self.fsf_beta_muse,
                         self.listTransferKernel[i])
 
-                    # truncate intensity map support after convolution using alpha_cut
+                    # truncate intensity map support after convolution using
+                    # alpha_cut
                     supp = getMainSupport(
                         intensityMapLRConvol[1:], alpha=self.params.alpha_cut)
                     intensityMapLRConvol[1:][~supp] = 0
@@ -256,7 +250,8 @@ class Deblending():
                     # put ones everywhere for background intensity map
                     intensityMapLRConvol[0] = 1.
 
-                    # U : n x k (n number of pixels, k number of objects, lmbda number of wavelengths)
+                    # U : n x k (n number of pixels, k number of objects,
+                    #            lmbda number of wavelengths)
                     # Y : n x lmbda
                     # Yvar : n x lmbda
 
@@ -288,24 +283,16 @@ class Deblending():
                         for u in range(U_.shape[1]):
                             support[U_[:, u] > 0.1 * np.max(U_[:, u])] = True
 
-                        #Y_sig2 = np.var(Y[~support, :], axis=0)
+                        # Y_sig2 = np.var(Y[~support, :], axis=0)
                         Y_sig2 = np.mean(Yvar, axis=0)
-                        res = regulDeblendFunc(
-                            U_,
-                            Y,
-                            Y_c=Y_c,
-                            support=support,
-                            Y_sig2=Y_sig2,
-                            filt_w=filt_w)
+                        res = regulDeblendFunc(U_, Y, Y_c=Y_c, support=support,
+                                               Y_sig2=Y_sig2, filt_w=filt_w)
 
                         # get spectra estimation
-
-                        self.tmp_sources[j][1:, i *
-                                            delta:(i + 1) * delta] = res[0]
-                        # for background spectrum get intercept (multiply by number
-                        # of pixels to get tot flux)
-                        self.tmp_sources[j][0, i *
-                                            delta:(i + 1) * delta] = res[1] * U.shape[0]
+                        self.tmp_sources[j][1:, i * delta:(i + 1) * delta] = res[0]
+                        # for background spectrum get intercept (multiply by
+                        # number of pixels to get tot flux)
+                        self.tmp_sources[j][0, i * delta:(i + 1) * delta] = res[1] * U.shape[0]
 
                         # store all elements for checking purposes
                         self.listAlphas[j][i] = res[8]
@@ -321,10 +308,7 @@ class Deblending():
                             self.listYc[j][i] = res[7]
 
                     else:  # use classical least squares solution
-                        self.tmp_sources[j][:, i *
-                                            delta:(i +
-                                                   1) *
-                                            delta] = np.linalg.lstsq(U, Y)[0]
+                        self.tmp_sources[j][:, i * delta:(i + 1) * delta] = np.linalg.lstsq(U, Y)[0]
 
                     # get spectra variance : as spectra is obtained by (U^T.U)^(-1).U^T.Y
                     # variance of estimated spectra is obtained by
@@ -350,7 +334,9 @@ class Deblending():
                         self.listYl[j][i] = None
                         self.listYc[j][i] = None
                     self.listIntensityMapLRConvol[j].append(
-                        np.zeros((self.nbSources, self.shapeLR[0] * self.shapeLR[1])))
+                        np.zeros((self.nbSources,
+                                  self.shapeLR[0] * self.shapeLR[1]))
+                    )
 
         self._combineSpectra()
         self.estimatedCube.data = self._rebuildCube(self.tmp_sources)
@@ -399,10 +385,13 @@ class Deblending():
         weigthTot = np.sum([self.filtResp[j]
                             for j in range(len(self.filtResp))], axis=0)
         for i in range(self.nbSources):
-            self.sources[i] = np.sum([self.filtResp[j] * self.tmp_sources[j][i]
-                                      for j in range(len(self.filtResp))], axis=0) / weigthTot
-            self.varSources[i] = np.sum([self.filtResp[j] * self.tmp_var[j][i]
-                                         for j in range(len(self.filtResp))], axis=0) / weigthTot
+            self.sources[i] = np.sum([
+                self.filtResp[j] * self.tmp_sources[j][i]
+                for j in range(len(self.filtResp))], axis=0) / weigthTot
+            self.varSources[i] = np.sum([
+                self.filtResp[j] * self.tmp_var[j][i]
+                for j in range(len(self.filtResp))], axis=0) / weigthTot
+
         # for background, get voxel mean instead of sum
         self.sources[0] = self.sources[0] / self.cubeLR.size
         self.varSources[0] = self.varSources[0] / self.cubeLR.size
@@ -412,10 +401,8 @@ class Deblending():
         Create estimated cube. We have to work on each MUSE spectral bin as
         the spatial distribution is different on each bin
         """
-        estimatedCube = np.zeros(
-            (self.cubeLR.shape[0],
-             self.cubeLR.shape[1] *
-             self.cubeLR.shape[2]))
+        estimatedCube = np.zeros((self.cubeLR.shape[0],
+                                  self.cubeLR.shape[1] * self.cubeLR.shape[2]))
         delta = self.cubeLR.shape[0] / float(self.nBands)
 
         for i in range(self.nBands):
@@ -426,9 +413,9 @@ class Deblending():
             for j in range(len(self.filtResp)):
                 tmp.append(np.zeros_like(
                     estimatedCube[int(i * delta):int((i + 1) * delta), :]))
-                tmp[j] = np.dot(tmp_sources[j][:,
-                                               int(i * delta):int((i + 1) * delta)].T,
-                                self.listIntensityMapLRConvol[j][i])
+                tmp[j] = np.dot(
+                    tmp_sources[j][:, int(i * delta):int((i + 1) * delta)].T,
+                    self.listIntensityMapLRConvol[j][i])
 
             estimatedCube[int(i * delta):int((i + 1) * delta), :] = np.sum(
                 [(self.filtResp[l][int(i * delta):int((i + 1) * delta)] / weightTot)[:, np.newaxis] * tmp[l]
@@ -442,33 +429,30 @@ class Deblending():
 
     def _getContinuumCube(self, w=101):
         """
-        Build continuum cube by median filtering (much faster here as it is done on objects spectra instead of all pixel spectra)
+        Build continuum cube by median filtering (much faster here as it is
+        done on objects spectra instead of all pixel spectra)
         """
         self.sourcesCont = ssl.medfilt(self.sources, kernel_size=(1, w))
-        self.tmp_sourcesCont = [
-            ssl.medfilt(
-                tmp_source, kernel_size=(
-                    1, w)) for tmp_source in self.tmp_sources]
+        self.tmp_sourcesCont = [ssl.medfilt(tmp_source, kernel_size=(1, w))
+                                for tmp_source in self.tmp_sources]
         self.estimatedCubeCont = self._rebuildCube(self.tmp_sourcesCont)
 
     def _getHST_ID(self):
         """
-        Get the list of HST ids for each label of labelHR (first is background 'bg')
+        Get the list of HST ids for each label of labelHR (first is
+        background 'bg')
         """
-
-        listHST_ID = ['bg'] + [int(self.segmap[self.labelHR == k][0])
-                               for k in range(1, self.nbSources)]
-        return listHST_ID
+        return ['bg'] + [int(self.segmap[self.labelHR == k][0])
+                         for k in range(1, self.nbSources)]
 
     def getsp(self):
         """
-        Get estimated spectra as a dict (with the HST ids as keys) of mpdaf Spectra
+        Get estimated spectra as a dict (with the HST ids as keys) of
+        mpdaf Spectra
         """
         cat = {}
         for k, key in enumerate(self.listHST_ID):
-            cat[key] = Spectrum(
-                data=self.sources[k],
-                var=self.varSources[k],
-                wave=self.cube.wave)
+            cat[key] = Spectrum(data=self.sources[k], var=self.varSources[k],
+                                wave=self.cube.wave)
 
         return cat

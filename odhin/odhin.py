@@ -2,7 +2,6 @@
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-import matplotlib.patches as mpatches
 import multiprocessing
 import numpy as np
 import tqdm
@@ -21,7 +20,6 @@ class ODHIN():
                  imHST=None, main_kernel_transfert=None, write_dir=None):
         """
         Main class for deblending process
-
 
         Parameters
         ----------
@@ -112,6 +110,7 @@ class ODHIN():
         if cpu is not None and cpu < cpu_count:
             cpu_count = cpu
 
+        cpu_count = min(cpu_count, len(listGroupToDeblend))
         pool = multiprocessing.Pool(processes=cpu_count)
         if verbose:
             ntasks = len(listGroupToDeblend)
@@ -191,6 +190,7 @@ class ODHIN():
         ax : matplotlib axe
         groups: list of groups
         """
+        import matplotlib.patches as mpatches
         ax = get_fig_ax(ax)
         cm = cmap(self.imLabel.max(), random_state=12345)
         ax.imshow(self.imLabel, cmap=cm)
