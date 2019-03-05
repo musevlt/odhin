@@ -51,8 +51,9 @@ def block_sum(ar, fact):
 def generatePSF_HST(alphaHST, betaHST, shape=(375, 375), shapeMUSE=(25, 25)):
     """
     Generate PSF HST at MUSE resolution with Moffat model.
-    To increase precision (as this PSF is sharp) the construction is made on a larger array
-    then subsampled.
+
+    To increase precision (as this PSF is sharp) the construction is made on
+    a larger array then subsampled.
     """
     PSF_HST_HR = generateMoffatIm(
         shape=shape,
@@ -558,7 +559,8 @@ def modifSegmap(segmap, cat):
 
 # def get_cat_from_segmap(segmap):
 #     """
-#     Get IDs and center directly from a segmap (thus removing the need for an external catalag)
+#     Get IDs and center directly from a segmap (thus removing the need for
+#     an external catalag
 #     """
 #     # To be build
 #     pass
@@ -570,20 +572,15 @@ def extractHST(imHST, imMUSE, rot=True):
     """
     centerpix = (imMUSE.shape[0] // 2, imMUSE.shape[1] // 2)
     center = imMUSE.wcs.pix2sky(centerpix)[0]
-    step = imMUSE.get_step(u.arcsec)
-    stepHST = imHST.get_step(u.arcsec)
-    size = (step[1] * imMUSE.shape[1], step[0] *
-            imMUSE.shape[0])  # width then height
-    # size[0] is width so second dimension of the array
-    sizeHST = (size[0] / stepHST[1], size[1] / stepHST[0])
-    ext_size = (size[1] + 10, size[0] + 10)
-    ext_sizeHST = (ext_size[0] / stepHST[1], ext_size[1] / stepHST[0])
-    # centerHST = imHST.wcs.sky2pix(center, nearest=True)[0]
+    # size of MUSE image in arsec, (width, height)
+    size = np.array(imMUSE.shape[::-1]) * imMUSE.get_step(unit=u.arcsec)
+    ext_size = size + 10  # with 10" margin
 
     if rot is True:
-        imHST_tmp = imHST.subimage(center, ext_sizeHST, unit_size=None)
-        imHST_tmp = imHST_tmp.rotate(imMUSE.get_rot())
-        imHST2 = imHST_tmp.subimage(center, sizeHST, unit_size=None)
-    else:
-        imHST2 = imHST.subimage(center, sizeHST, unit_size=None)
-    return imHST2
+        pa_muse = imMUSE.get_rot()
+        pa_hst = imHST.get_rot()
+        if np.abs(pa_muse - pa_hst) > 1.e-3:
+            imHST_tmp = imHST.subimage(center, ext_size)
+            imHST = imHST_tmp.rotate(imMUSE.get_rot())
+
+    return imHST.subimage(center, size)

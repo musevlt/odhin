@@ -92,7 +92,7 @@ class ODHIN():
 
     def deblend(self, listGroupToDeblend=None, cpu=None, verbose=True):
         """
-        Parralelized deblending on a list of groups
+        Parallelized deblending on a list of groups
         """
         if self.groups is None:
             raise ValueError("No groups were defined. Please call a grouping "
