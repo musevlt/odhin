@@ -4,12 +4,13 @@
 
 import matplotlib.patches as mpatches
 import multiprocessing
+import numpy as np
 import tqdm
 from astropy.table import Table, vstack
 from mpdaf import CPU
 
 from . import multi_deblend
-from .deblend_utils import calcMainKernelTransfert
+from .deblend_utils import calcMainKernelTransfert, get_fig_ax, cmap
 from .grouping import doGrouping
 from .parameters import Params
 
@@ -180,61 +181,56 @@ class ODHIN():
 
     # Plotting functions
 
-    def plotGroups(self, ax, groups=None):
+    def plotGroups(self, ax=None, groups=None, linewidth=1):
         """
         ax : matplotlib axe
         groups: list of groups
         """
-        ax.imshow(self.imLabel)
+        ax = get_fig_ax(ax)
+        cm = cmap(self.imLabel.max(), random_state=12345)
+        ax.imshow(self.imLabel, cmap=cm)
         if groups is None:
             groups = self.groups
         for group in groups:
             minr, minc, maxr, maxc = group.region.bbox
             rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr,
-                                      fill=False, edgecolor='red', linewidth=2)
+                                      fill=False, edgecolor='red',
+                                      linewidth=linewidth)
             ax.add_patch(rect)
 
-    def plotAGroup(self, ax, group_id):
+    def plotAGroup(self, ax=None, group_id=None):
         """
         ax : matplotlib axe
         group_id: group id
         """
+        assert group_id is not None
+        ax = get_fig_ax(ax)
         group = self.groups[group_id]
         minr, minc, maxr, maxc = group.region.bbox
-        self.imMUSE[minr:maxr, minc:maxc].plot(ax=ax)
-        ax.contour(self.imLabel[minr:maxr, minc:maxc] == group_id + 1, levels=1, colors='r')
-        listX = []
-        listY = []
-        for src in group.listSources:
-            if 'bg' not in str(src):
-                row = self.cat.loc['ID', src]
-                y, x = self.imMUSE[minr:maxr, minc:maxc].wcs.sky2pix((row['DEC'], row['RA']))[0]
-                listX.append(x)
-                listY.append(y)
-        ax.scatter(listX, listY, c="r")
+        subim = self.imMUSE[minr:maxr, minc:maxc]
+        subim.plot(ax=ax)
+        ax.contour(self.imLabel[minr:maxr, minc:maxc] == group_id + 1,
+                   levels=1, colors='r')
 
-    def plotHistArea(self, ax, nbins=20):
-        """
-        Plot histogram of group areas
+        src = group.listSources.copy()
+        cat = self.cat[np.in1d(self.cat['ID'], src)]
+        y, x = subim.wcs.sky2pix(np.array([cat['DEC'], cat['RA']]).T).T
+        ax.scatter(x, y, c="r")
 
+    def plotHistArea(self, ax=None, nbins='auto'):
+        """Plot histogram of group areas.
 
         ax : matplotlib axe
         nbins: number of bins for histogram
         """
-        listArea = []
-        for group in self.groups:
-            listArea.append(group.region.area)
-        ax.hist(listArea, bins=nbins)
+        ax = get_fig_ax(ax)
+        ax.hist([group.region.area for group in self.groups], bins=nbins)
 
-    def plotHistNbS(self, ax, nbins=20):
-        """
-        Plot histogram of group number of sources
-
+    def plotHistNbS(self, ax=None, nbins='auto'):
+        """Plot histogram of group number of sources.
 
         ax : matplotlib axe
         nbins: number of bins for histogram
         """
-        listNbS = []
-        for group in self.groups:
-            listNbS.append(group.nbSources)
-        ax.hist(listNbS, bins=nbins)
+        ax = get_fig_ax(ax)
+        ax.hist([group.nbSources for group in self.groups], bins=nbins)

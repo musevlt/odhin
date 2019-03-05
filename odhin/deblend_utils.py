@@ -13,6 +13,29 @@ from scipy import ndimage
 from photutils import create_matching_kernel, TopHatWindow, SegmentationImage
 
 
+def get_fig_ax(ax=None):
+    if ax is None:
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots()
+    return ax
+
+
+def cmap(max_label, background_color='#000000', random_state=None):
+    """
+    A matplotlib colormap consisting of random (muted) colors, taken from
+    photutils SegmentationImage.cmap.
+    """
+    from matplotlib import colors
+    from photutils.utils.colormaps import random_cmap
+
+    cmap = random_cmap(max_label + 1, random_state=random_state)
+
+    if background_color is not None:
+        cmap.colors[0] = colors.hex2color(background_color)
+
+    return cmap
+
+
 def block_sum(ar, fact):
     """
     Subsample a matrix *ar* by a integer factor *fact* using sums.
