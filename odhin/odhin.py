@@ -95,9 +95,8 @@ class ODHIN():
         Parralelized deblending on a list of groups
         """
         if self.groups is None:
-            print("No groups were defined. Please call a grouping method "
-                  "before doing a deblend")
-            return 0
+            raise ValueError("No groups were defined. Please call a grouping "
+                             "method before doing a deblend")
 
         # if no special groups are listed, do on all groups
         if listGroupToDeblend is None:
@@ -129,10 +128,15 @@ class ODHIN():
         for i in listGroupToDeblend:
             reg = self.groups[i].region
             blob = (self.imLabel == i + 1)
-            subcube, subhstimages, subsegmap, listObjInBlob, listHSTObjInBlob = multi_deblend.getInputs(
-                self.cube, self.hstimages, self.segmap, blob, reg.bbox, self.imLabel, self.cat)
-            results_async.append(pool.apply_async(multi_deblend.deblendGroup, args=(
-                subcube, subhstimages, subsegmap, listObjInBlob, listHSTObjInBlob, i, self.write_dir), callback=update))
+            # args: subcube, subhstimages, subsegmap, listObjInBlob,
+            # listHSTObjInBlob
+            args = multi_deblend.getInputs(
+                self.cube, self.hstimages, self.segmap, blob, reg.bbox,
+                self.imLabel, self.cat)
+            job = pool.apply_async(multi_deblend.deblendGroup,
+                                   args=args+(i, self.write_dir),
+                                   callback=update)
+            results_async.append(job)
 
         pool.close()
         pool.join()
@@ -149,7 +153,8 @@ class ODHIN():
         self.dict_observed_cube = {}
         for res in results:
             if self.write_dir is None:
-                table_tmp, dict_spec_tmp, cube_observed_tmp, cube_estimated_tmp, group_id, cond_number, xi2 = res.get()
+                (table_tmp, dict_spec_tmp, cube_observed_tmp,
+                 cube_estimated_tmp, group_id, cond_number, xi2) = res.get()
             else:
                 table_tmp, dict_spec_tmp, group_id, cond_number, xi2 = res.get()
             if self.table_sources is None:

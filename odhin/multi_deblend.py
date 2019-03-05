@@ -13,7 +13,8 @@ from .grouping import getObjsInBlob
 
 def getInputs(cube, hstimages, segmap, blob_mask, bbox, imLabel, cat):
     """
-    Extract data for each group before the multiprocessing (avoid large datasets copies)
+    Extract data for each group before the multiprocessing (avoid large
+    datasets copies)
     """
     subcube = cube[:, bbox[0]:bbox[2], bbox[1]:bbox[3]]
     copyHeaderWCSInfo(subcube)  # need to copy some header infos
@@ -56,12 +57,17 @@ def getRes(debl, listObjInBlob, listHSTObjInBlob, group_id=0, write_dir=None):
         ID = debl.listHST_ID[k]
         xi2 = calcXi2_source(debl, k)
         data_rows.append((ID, xi2, cond_number, group_id))
-    t = table.Table(rows=data_rows, names=('ID', 'Xi2', 'Condition Number', 'G_ID'))
+    t = table.Table(rows=data_rows,
+                    names=('ID', 'Xi2', 'Condition Number', 'G_ID'))
+
     if write_dir is None:
-        return t, dic_spec, debl.cube, debl.estimatedCube, group_id, cond_number, xi2_tot
+        return (t, dic_spec, debl.cube, debl.estimatedCube, group_id,
+                cond_number, xi2_tot)
     else:
-        debl.cube.write(os.path.join(write_dir, "cube" + "_orig_%s" % (group_id) + ".fits"))
-        debl.estimatedCube.write(os.path.join(write_dir, "cube" + "_estim_%s" % (group_id) + ".fits"))
+        debl.cube.write(
+            os.path.join(write_dir, "cube_orig_%s.fits" % group_id))
+        debl.estimatedCube.write(
+            os.path.join(write_dir, "cube_estim_%s.fits" % group_id))
         return t, dic_spec, group_id, cond_number, xi2_tot
 
 
@@ -74,8 +80,9 @@ def copyHeaderWCSInfo(new):
         new.data_header[key] = new_header[key]
 
 
-def deblendGroup(subcube, subhstimages, subsegmap, listObjInBlob, listHSTObjInBlob, group_id, write_dir=None):
+def deblendGroup(subcube, subhstimages, subsegmap, listObjInBlob,
+                 listHSTObjInBlob, group_id, write_dir=None):
     debl = Deblending(subcube, subhstimages)
     debl.createIntensityMap(subsegmap.data.filled(0.))
     debl.findSources()
-    return(getRes(debl, listObjInBlob, listHSTObjInBlob, group_id, write_dir))
+    return getRes(debl, listObjInBlob, listHSTObjInBlob, group_id, write_dir)
