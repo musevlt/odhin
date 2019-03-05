@@ -5,7 +5,7 @@
 import matplotlib.patches as mpatches
 import multiprocessing
 import tqdm
-from astropy import table
+from astropy.table import Table, vstack
 from mpdaf import CPU
 
 from . import multi_deblend
@@ -16,7 +16,8 @@ from .parameters import Params
 
 class ODHIN():
 
-    def __init__(self, cube, hstimages, segmap, cat, params=None, imMUSE=None, imHST=None, main_kernel_transfert=None, write_dir=None):
+    def __init__(self, cube, hstimages, segmap, cat, params=None, imMUSE=None,
+                 imHST=None, main_kernel_transfert=None, write_dir=None):
         """
         Main class for deblending process
 
@@ -62,31 +63,30 @@ class ODHIN():
         if params is None:
             self.params = Params()
         self.groups = None
-        if imMUSE is None:  # if nothing provided take white image of the cube
-            self.imMUSE = self.cube.sum(axis=0)
-        else:
-            self.imMUSE = imMUSE
-        if imHST is None:  # if nothing provided take the first of the HST images
-            self.imHST = self.hstimages[0]
-        else:
-            self.imHST = imHST
-        if main_kernel_transfert is None:  # if nothing provided build transfer kernel from default parameters
-            self.main_kernel_transfert = calcMainKernelTransfert(self.params, self.imHST)
-        else:
-            self.main_kernel_transfert = main_kernel_transfert
+
+        # if nothing provided take white image of the cube
+        self.imMUSE = imMUSE or self.cube.sum(axis=0)
+
+        # if nothing provided take the first of the HST images
+        self.imHST = imHST or self.hstimages[0]
+
+        # if nothing provided build transfer kernel from default parameters
+        self.main_kernel_transfert = main_kernel_transfert or \
+            calcMainKernelTransfert(self.params, self.imHST)
+
         self.results = dict({})
 
     def grouping(self, verbose=True, cut=None):
         """
-        Segment all sources in a number of connected (at the MUSE resolution) groups
-        and build a table of the groups
+        Segment all sources in a number of connected (at the MUSE resolution)
+        groups and build a table of the groups.
         """
         if cut is not None:
             self.params.cut = cut
 
-        self.groups, self.imLabel = doGrouping(self.cube, self.imHST, self.segmap,
-                                               self.imMUSE, self.cat, self.main_kernel_transfert,
-                                               params=self.params, verbose=verbose)
+        self.groups, self.imLabel = doGrouping(
+            self.cube, self.imHST, self.segmap, self.imMUSE, self.cat,
+            self.main_kernel_transfert, params=self.params, verbose=verbose)
         self.buildGroupTable()
 
     def deblend(self, listGroupToDeblend=None, cpu=None, verbose=True):
@@ -94,8 +94,8 @@ class ODHIN():
         Parralelized deblending on a list of groups
         """
         if self.groups is None:
-            print(
-                "No groups were defined. Please call a grouping method before doing a deblend")
+            print("No groups were defined. Please call a grouping method "
+                  "before doing a deblend")
             return 0
 
         # if no special groups are listed, do on all groups
@@ -154,7 +154,7 @@ class ODHIN():
             if self.table_sources is None:
                 self.table_sources = table_tmp
             else:
-                self.table_sources = table.vstack([self.table_sources, table_tmp])
+                self.table_sources = vstack([self.table_sources, table_tmp])
             self.dict_spec.update(dict_spec_tmp)
             if self.write_dir is None:
                 self.dict_estimated_cube[group_id] = cube_estimated_tmp
@@ -169,11 +169,15 @@ class ODHIN():
         self.results['Spectra'] = self.dict_spec
 
     def buildGroupTable(self):
-        self.table_groups = table.Table(names=('G_ID', 'nbSources', 'listIDs', 'Area', 'Xi2', 'Condition Number'),
-                                        dtype=(int, int, tuple, float, float, float))
-
+        self.table_groups = Table(
+            names=('G_ID', 'nbSources', 'listIDs', 'Area', 'Xi2',
+                   'Condition Number'),
+            dtype=(int, int, tuple, float, float, float)
+        )
         for i, group in enumerate(self.groups):
-            self.table_groups.add_row([i, group.nbSources, tuple(group.listSources), group.region.area, 0, 0])
+            self.table_groups.add_row(
+                [i, group.nbSources, tuple(group.listSources),
+                 group.region.area, 0, 0])
 
         self.table_groups.add_index('G_ID')
 

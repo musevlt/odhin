@@ -51,13 +51,20 @@ def getRegionAttr(sk_region):
     return region
 
 
-def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params, verbose=True):
+def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
+               verbose=True):
     """
-    Segment all sources in a number of connected (at the MUSE resolution) groups
+    Segment all sources in a number of connected (at the MUSE resolution)
+    groups
     """
+    # needed because of potential discrepancy between the catalog and the
+    # segmentation map (as in Rafelski15)
+    segmap = modifSegmap(segmap, cat)
+
+    intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE,
+                                              kernel_transfert, params)
+
     cut = params.cut
-    segmap = modifSegmap(segmap, cat)  # needed because of potential discrepancy between the catalog and the segmentation map (as in Rafelski15)
-    intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE, kernel_transfert, params)
     imLabel = label(intensityMapLRConvol > cut)
     listGroups = []
 
@@ -71,15 +78,18 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params, verbos
     for i, sk_region in enumerate(listRegions):
         region = getRegionAttr(sk_region)
         blob_mask = (imLabel == i + 1)
-        ensureMinimalBbox(region, params.min_width, imLabel, params.min_sky_pixels, params.margin_bbox)
+        ensureMinimalBbox(region, params.min_width, imLabel,
+                          params.min_sky_pixels, params.margin_bbox)
         bbox = region.bbox  # order is row0,column0,row1,column1
 
         bboxHR = convertBboxToHR(bbox, segmap, imMUSE)
         subsegmap = segmap.data[bboxHR[0]:bboxHR[2], bboxHR[1]:bboxHR[3]]
         sub_blob_mask = blob_mask[bbox[0]:bbox[2], bbox[1]:bbox[3]]
         subimMUSE = imMUSE[bbox[0]:bbox[2], bbox[1]:bbox[3]]
-        listSources = getObjsInBlob(keys_cat, cat, sub_blob_mask, subimMUSE, subsegmap)[1]
-        listGroups.append(SourceGroup(GID=i, listSources=listSources, region=region))
+        listSources = getObjsInBlob(keys_cat, cat, sub_blob_mask, subimMUSE,
+                                    subsegmap)[1]
+        listGroups.append(SourceGroup(GID=i, listSources=listSources,
+                                      region=region))
         if verbose:
             pbar.update(1)
 
