@@ -489,11 +489,19 @@ def createIntensityMap(imHR, segmap, imLR, kernel_transfert, params=None):
 
     """
     if params is None:
-        params = Params()
+        # FIXME: params = Params()
+        raise ValueError('this case is not implemented!')
 
     # create image of label reindexed squentially from 0 to nSources
     segmapIm = SegmentationImage(segmap.data)
-    segmapIm.relabel_sequential()
+    try:
+        # new method in photutils v0.5
+        relabel_func = segmapIm.relabel_consecutive
+    except AttributeError:
+        # old method
+        relabel_func = segmapIm.relabel_sequential
+
+    relabel_func()
     labelHR = segmapIm.data
 
     intensityMapHR = np.zeros(imHR.shape)
