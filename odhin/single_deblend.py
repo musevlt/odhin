@@ -3,10 +3,13 @@
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-import scipy.signal as ssl
-import numpy as np
 import astropy.units as units
+import numpy as np
+import scipy.signal as ssl
+
+from astropy.table import Table
 from mpdaf.obj import Spectrum
+from mpdaf.sdetect import Source
 
 from .regularization import regulDeblendFunc, medfilt
 from .parameters import Params
@@ -454,3 +457,56 @@ class Deblending():
         return {key: Spectrum(data=self.sources[k], var=self.varSources[k],
                               wave=self.cube.wave)
                 for k, key in enumerate(self.listHST_ID)}
+
+    @property
+    def Xi2_tot(self):
+        return (1 / (np.size(self.residuals) - 3) *
+                np.sum(self.residuals**2 / self.cubeLRVar))
+
+    def calcXi2_source(self, k):
+        mask = self.listIntensityMapLRConvol[0][0][k].reshape(self.shapeLR) > 0
+        return (1 / (np.size(self.residuals[:, mask]) - 3) *
+                np.sum(self.residuals[:, mask]**2 / self.cubeLRVar[:, mask]))
+
+    def calcCondNumber(self, listobj=None):
+        """Compute condition number."""
+        if listobj is None:
+            mat = np.array(self.listIntensityMapLRConvol[0][0][1:])
+        else:
+            mat = np.array(self.listIntensityMapLRConvol[0][0][listobj][1:])
+
+        mat /= mat.sum(axis=1)[:, None]
+        return np.linalg.cond(mat)
+
+    def write(self, outfile, listObjInBlob, listHSTObjInBlob, group_id=0):
+        origin = ('Odhin', '1.0-beta2', self.cube.filename,
+                  self.cube.primary_header.get('CUBE_V', ''))
+        src = Source.from_data(group_id, 0, 0, origin=origin)
+
+        cond_number = self.calcCondNumber(listObjInBlob)
+        src.header['COND_NB'] = cond_number
+        src.header['XI2_TOT'] = self.Xi2_tot
+
+        dic_spec = self.getsp()
+        dic_spec[f'bg_{group_id}'] = dic_spec.pop('bg')
+
+        # remove spectra from objects not in the blob
+        listKToRemove = []
+        for k in dic_spec.keys():
+            if k not in (listHSTObjInBlob + [f'bg_{group_id}']):
+                listKToRemove.append(k)
+        for k in listKToRemove:
+            dic_spec.pop(k)
+
+        src.spectra.update(dic_spec)
+
+        # build sources table
+        rows = [(self.listHST_ID[k], group_id, self.calcXi2_source(k),
+                 cond_number) for k in listObjInBlob]
+        t = Table(rows=rows, names=('ID', 'G_ID', 'Xi2', 'Condition Number'))
+        src.tables['sources'] = t
+
+        src.cubes['orig'] = self.cube
+        src.cubes['estim'] = self.estimatedCube
+
+        src.write(outfile)

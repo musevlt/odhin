@@ -10,7 +10,7 @@ import numpy as np
 import tqdm
 from skimage.measure import regionprops, label
 
-from .deblend_utils import _getLabel, createIntensityMap, modifSegmap
+from .deblend_utils import createIntensityMap, modifSegmap
 
 
 class SourceGroup():

@@ -4,6 +4,7 @@
 
 import multiprocessing
 import numpy as np
+import pathlib
 import tqdm
 from astropy.table import Table, vstack
 from mpdaf import CPU
@@ -16,21 +17,23 @@ from .parameters import Params
 
 class ODHIN():
 
-    def __init__(self, cube, hstimages, segmap, cat, params=None, imMUSE=None,
-                 imHST=None, main_kernel_transfert=None, write_dir=None):
+    def __init__(self, cube, hstimages, segmap, cat, output_dir, params=None,
+                 imMUSE=None, imHST=None, main_kernel_transfert=None):
         """
         Main class for deblending process
 
         Parameters
         ----------
-        cube : mpdaf Cube
+        cube : mpdaf.obj.Cube
             The mpdaf Cube object to be deblended
-        hstimages: mpdaf Image
+        hstimages: list of mpdaf.obj.Image
             HST mpdaf images
-        segmap : mpdaf Image
+        segmap : mpdaf.obj.Image
             segmentation map at HST resolution
-        cat: mpdaf Catalog
+        cat: mpdaf.sdetect.Catalog
             catalog of sources
+        output_dir: str
+            if not None, results of each group is saved in this directory
         params : class with all parameters
             defined in module parameters
         imMUSE (opt):
@@ -40,17 +43,11 @@ class ODHIN():
         main_kernel_transfert (opt):
             kernel HST->MUSE to be used for preprocessing (grouping).
             If none provided build transfer kernel from default parameters
-        write_dir (opt):
-            if not None, results of each group is saved in this directory
 
         Attributes
         ----------
-        results
         table_groups
         table_sources
-        dict_estimated_cube
-        dict_observed_cube
-        dict_spec
         """
 
         self.cube = cube
@@ -58,7 +55,7 @@ class ODHIN():
         self.segmap = segmap
         self.cat = cat
         self.params = params
-        self.write_dir = write_dir
+        self.output_dir = pathlib.Path(output_dir)
         if params is None:
             self.params = Params()
         self.groups = None
@@ -73,8 +70,6 @@ class ODHIN():
         self.main_kernel_transfert = main_kernel_transfert or \
             calcMainKernelTransfert(self.params, self.imHST)
 
-        self.results = dict({})
-
     def grouping(self, verbose=True, cut=None):
         """
         Segment all sources in a number of connected (at the MUSE resolution)
@@ -86,7 +81,15 @@ class ODHIN():
         self.groups, self.imLabel = doGrouping(
             self.cube, self.imHST, self.segmap, self.imMUSE, self.cat,
             self.main_kernel_transfert, params=self.params, verbose=verbose)
-        self.buildGroupTable()
+
+        names = ('G_ID', 'nbSources', 'listIDs', 'Area', 'Xi2',
+                 'Condition Number')
+        groups = [[i, group.nbSources, tuple(group.listSources),
+                   group.region.area, 0, 0]
+                  for i, group in enumerate(self.groups)]
+        self.table_groups = Table(names=names, rows=groups,
+                                  dtype=(int, int, tuple, float, float, float))
+        self.table_groups.add_index('G_ID')
 
     def deblend(self, listGroupToDeblend=None, cpu=None, verbose=True):
         """
@@ -124,7 +127,6 @@ class ODHIN():
                 def update(*a):
                     pass
 
-            results_async = []
             for i in listGroupToDeblend:
                 reg = self.groups[i].region
                 blob = (self.imLabel == i + 1)
@@ -133,17 +135,13 @@ class ODHIN():
                 args = multi_deblend.getInputs(
                     self.cube, self.hstimages, self.segmap, blob, reg.bbox,
                     self.imLabel, self.cat)
-                job = pool.apply_async(multi_deblend.deblendGroup,
-                                       args=args+(i, self.write_dir),
-                                       callback=update)
-                results_async.append(job)
+                outfile = str(self.output_dir / f'group_{i:05d}.fits')
+                pool.apply_async(multi_deblend.deblendGroup,
+                                 args=args+(i, outfile), callback=update)
 
             pool.close()
             pool.join()
-
-            self.buildResults([res.get() for res in results_async])
         else:
-            results = []
             for i in listGroupToDeblend:
                 reg = self.groups[i].region
                 blob = (self.imLabel == i + 1)
@@ -152,51 +150,22 @@ class ODHIN():
                 args = multi_deblend.getInputs(
                     self.cube, self.hstimages, self.segmap, blob, reg.bbox,
                     self.imLabel, self.cat)
-                res = multi_deblend.deblendGroup(*args, i, self.write_dir)
-                results.append(res)
+                outfile = str(self.output_dir / f'group_{i:05d}.fits')
+                multi_deblend.deblendGroup(*args, i, outfile)
 
-            self.buildResults(results)
+        self.build_result_table()
 
-    # Results functions
+    def build_result_table(self):
+        tables = [Table.read(f, hdu='TAB_SOURCE')
+                  for f in self.output_dir.glob('group_*.fits')]
+        self.table_sources = vstack(tables)
+        return self.table_sources
 
-    def buildResults(self, results):
+        # self.table_groups.loc[group_id]['Xi2'] = xi2
+        # self.table_groups.loc[group_id]['Condition Number'] = cond_number
 
-        self.table_sources = None
-        self.dict_spec = {}
-        self.dict_estimated_cube = {}
-        self.dict_observed_cube = {}
-        for res in results:
-            if self.write_dir is None:
-                (table_tmp, dict_spec_tmp, cube_observed_tmp,
-                 cube_estimated_tmp, group_id, cond_number, xi2) = res
-            else:
-                table_tmp, dict_spec_tmp, group_id, cond_number, xi2 = res
-            if self.table_sources is None:
-                self.table_sources = table_tmp
-            else:
-                self.table_sources = vstack([self.table_sources, table_tmp])
-            self.dict_spec.update(dict_spec_tmp)
-            if self.write_dir is None:
-                self.dict_estimated_cube[group_id] = cube_estimated_tmp
-                self.dict_observed_cube[group_id] = cube_observed_tmp
-            self.table_groups.loc[group_id]['Xi2'] = xi2
-            self.table_groups.loc[group_id]['Condition Number'] = cond_number
-
-        self.results['Table Groups'] = self.table_groups
-        self.results['Table Sources'] = self.table_sources
-        self.results['Observed Cubes'] = self.dict_observed_cube
-        self.results['Estimated Cubes'] = self.dict_estimated_cube
-        self.results['Spectra'] = self.dict_spec
-
-    def buildGroupTable(self):
-        names = ('G_ID', 'nbSources', 'listIDs', 'Area', 'Xi2',
-                 'Condition Number')
-        groups = [[i, group.nbSources, tuple(group.listSources),
-                   group.region.area, 0, 0]
-                  for i, group in enumerate(self.groups)]
-        self.table_groups = Table(names=names, rows=groups,
-                                  dtype=(int, int, tuple, float, float, float))
-        self.table_groups.add_index('G_ID')
+        # self.results['Table Groups'] = self.table_groups
+        # self.results['Table Sources'] = self.table_sources
 
     # Plotting functions
 

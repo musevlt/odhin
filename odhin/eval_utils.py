@@ -10,38 +10,6 @@ import numpy as np
 import scipy.signal as ssl
 
 
-def calcCondNumber(debl, listobj=None):
-    """
-    Compute condition number on a odhin object
-    """
-    if listobj is None:
-        mat = np.array(debl.listIntensityMapLRConvol[0][0][1:])
-    else:
-        mat = np.array(debl.listIntensityMapLRConvol[0][0][listobj][1:])
-    for col in mat:
-        col[:] = col / np.sum(col)
-    cond = np.linalg.cond(mat)
-    return cond
-
-
-def calcXi2_tot(debl):
-    xi2 = 1 / (np.size(debl.residuals) - 3) * np.sum(debl.residuals**2 / debl.cubeLRVar)
-    return xi2
-
-
-def calcXi2_source(debl, k):
-    mask = debl.listIntensityMapLRConvol[0][0][k].reshape(debl.shapeLR) > 0
-    xi2 = 1 / (np.size(debl.residuals[:, mask]) - 3) * np.sum(debl.residuals[:, mask]**2 / debl.cubeLRVar[:, mask])
-    return xi2
-
-
-def calcCondNumber2(mat):
-    for col in mat:
-        col[:] = col / np.sum(col)
-    cond = np.linalg.cond(mat)
-    return cond
-
-
 def calcInterCorr(debl, w=101):
     spe0 = debl.sources[0] - ssl.medfilt(debl.sources[0], kernel_size=w)
     spe1 = debl.sources[1] - ssl.medfilt(debl.sources[1], kernel_size=w)
