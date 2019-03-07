@@ -17,14 +17,12 @@ def getInputs(cube, hstimages, segmap, blob_mask, bbox, imLabel, cat):
     datasets copies)
     """
     subcube = cube[:, bbox[0]:bbox[2], bbox[1]:bbox[3]]
-    copyHeaderWCSInfo(subcube)  # need to copy some header infos
-
     subsegmap = extractHST(segmap, subcube[0])
-    copyHeaderWCSInfo(subsegmap)
-
     subhstimages = [extractHST(hst, subcube[0]) for hst in hstimages]
-    for im in subhstimages:
-        copyHeaderWCSInfo(im)
+
+    for obj in [subcube, subsegmap] + subhstimages:
+        # need to copy some header infos
+        copyHeaderWCSInfo(obj)
 
     sub_blob_mask = blob_mask[bbox[0]:bbox[2], bbox[1]:bbox[3]]
     imMUSE = cube[0]
@@ -74,9 +72,7 @@ def copyHeaderWCSInfo(new):
     """
     needed because wcs info are not completly copied during an image resize
     """
-    new_header = new.wcs.to_header()
-    for key in new_header:
-        new.data_header[key] = new_header[key]
+    new.data_header.update(new.wcs.to_header())
 
 
 def deblendGroup(subcube, subhstimages, subsegmap, listObjInBlob,

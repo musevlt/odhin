@@ -111,36 +111,51 @@ class ODHIN():
             cpu_count = cpu
 
         cpu_count = min(cpu_count, len(listGroupToDeblend))
-        pool = multiprocessing.Pool(processes=cpu_count)
-        if verbose:
-            ntasks = len(listGroupToDeblend)
-            # add progress bar
-            pbar = tqdm.tqdm(total=ntasks)
+        if cpu_count > 1:
+            pool = multiprocessing.Pool(processes=cpu_count)
+            if verbose:
+                ntasks = len(listGroupToDeblend)
+                # add progress bar
+                pbar = tqdm.tqdm(total=ntasks)
 
-            def update(*a):
-                pbar.update()
+                def update(*a):
+                    pbar.update()
+            else:
+                def update(*a):
+                    pass
+
+            results_async = []
+            for i in listGroupToDeblend:
+                reg = self.groups[i].region
+                blob = (self.imLabel == i + 1)
+                # args: subcube, subhstimages, subsegmap, listObjInBlob,
+                # listHSTObjInBlob
+                args = multi_deblend.getInputs(
+                    self.cube, self.hstimages, self.segmap, blob, reg.bbox,
+                    self.imLabel, self.cat)
+                job = pool.apply_async(multi_deblend.deblendGroup,
+                                       args=args+(i, self.write_dir),
+                                       callback=update)
+                results_async.append(job)
+
+            pool.close()
+            pool.join()
+
+            self.buildResults([res.get() for res in results_async])
         else:
-            def update(*a):
-                pass
+            results = []
+            for i in listGroupToDeblend:
+                reg = self.groups[i].region
+                blob = (self.imLabel == i + 1)
+                # args: subcube, subhstimages, subsegmap, listObjInBlob,
+                # listHSTObjInBlob
+                args = multi_deblend.getInputs(
+                    self.cube, self.hstimages, self.segmap, blob, reg.bbox,
+                    self.imLabel, self.cat)
+                res = multi_deblend.deblendGroup(*args, i, self.write_dir)
+                results.append(res)
 
-        results_async = []
-        for i in listGroupToDeblend:
-            reg = self.groups[i].region
-            blob = (self.imLabel == i + 1)
-            # args: subcube, subhstimages, subsegmap, listObjInBlob,
-            # listHSTObjInBlob
-            args = multi_deblend.getInputs(
-                self.cube, self.hstimages, self.segmap, blob, reg.bbox,
-                self.imLabel, self.cat)
-            job = pool.apply_async(multi_deblend.deblendGroup,
-                                   args=args+(i, self.write_dir),
-                                   callback=update)
-            results_async.append(job)
-
-        pool.close()
-        pool.join()
-
-        self.buildResults(results_async)
+            self.buildResults(results)
 
     # Results functions
 
@@ -153,9 +168,9 @@ class ODHIN():
         for res in results:
             if self.write_dir is None:
                 (table_tmp, dict_spec_tmp, cube_observed_tmp,
-                 cube_estimated_tmp, group_id, cond_number, xi2) = res.get()
+                 cube_estimated_tmp, group_id, cond_number, xi2) = res
             else:
-                table_tmp, dict_spec_tmp, group_id, cond_number, xi2 = res.get()
+                table_tmp, dict_spec_tmp, group_id, cond_number, xi2 = res
             if self.table_sources is None:
                 self.table_sources = table_tmp
             else:

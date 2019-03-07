@@ -126,6 +126,7 @@ class Deblending():
         # labelisation
         self.segmap = segmap
         if segmap is None:
+            # FIXME: this will break with _getLabel ?
             self.labelHR = _getLabel(self.listImagesHR[0].data, thresh)
         else:
             self.labelHR = _getLabel(segmap=segmap)
