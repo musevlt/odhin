@@ -30,9 +30,8 @@ def getInputs(cube, hstimages, segmap, blob_mask, bbox, imLabel, cat):
     imMUSE = cube[0]
 
     subimMUSE = imMUSE[bbox[0]:bbox[2], bbox[1]:bbox[3]]
-    keys_cat = cat['ID']
     listObjInBlob, listHSTObjInBlob = getObjsInBlob(
-        keys_cat, cat, sub_blob_mask, subimMUSE, subsegmap.data.filled(0))
+        'ID', cat, sub_blob_mask, subimMUSE, subsegmap.data.filled(0))
 
     return subcube, subhstimages, subsegmap, listObjInBlob, listHSTObjInBlob
 

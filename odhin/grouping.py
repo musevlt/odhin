@@ -72,7 +72,6 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
         ntasks = len(regionprops(imLabel))
         pbar = tqdm.tqdm(total=ntasks)
 
-    keys_cat = cat['ID']
     listRegions = regionprops(imLabel)
 
     for i, sk_region in enumerate(listRegions):
@@ -86,7 +85,7 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
         subsegmap = segmap.data[bboxHR[0]:bboxHR[2], bboxHR[1]:bboxHR[3]]
         sub_blob_mask = blob_mask[bbox[0]:bbox[2], bbox[1]:bbox[3]]
         subimMUSE = imMUSE[bbox[0]:bbox[2], bbox[1]:bbox[3]]
-        listSources = getObjsInBlob(keys_cat, cat, sub_blob_mask, subimMUSE,
+        listSources = getObjsInBlob('ID', cat, sub_blob_mask, subimMUSE,
                                     subsegmap)[1]
         listGroups.append(SourceGroup(GID=i, listSources=listSources,
                                       region=region))
@@ -131,29 +130,55 @@ def ensureMinimalBbox(region, width, imLabel, min_sky_pixels, margin_bbox):
         region.area = (region.bbox[2] - region.bbox[0]) * region.bbox[3] - region.bbox[1]
 
 
-def getObjsInBlob(keys_cat, cat, sub_blob_mask, subimMUSE, subsegmap):
-    """
+# def getObjsInBlob(keys_cat, cat, sub_blob_mask, subimMUSE, subsegmap):
+#     """
+
+#     output
+#     ------
+#     listObjInBlob : list of simple indices (from 0 to nb of sources in
+#     bounding box) of objects in the bounding box connected to the blob
+#     listObjInBlob : list of catalog indices  of objects in the bounding
+#     box connected to the blob
+#     """
+#     listObjInBlob = [0]
+#     listHSTObjInBlob = ['bg']
+#     labelHR = _getLabel(subsegmap)
+#     nbSources = np.max(labelHR) + 1
+#     listHST_ID = ['bg'] + [int(subsegmap[labelHR == k][0])
+#                            for k in range(1, nbSources)]
+#     for k in range(1, len(listHST_ID)):
+#         if listHST_ID[k] in keys_cat:
+#             row = cat.loc['ID', listHST_ID[k]]
+#             center = (row['DEC'], row['RA'])
+#             centerMUSE = subimMUSE.wcs.sky2pix([center], nearest=True)[0]
+#             if sub_blob_mask[centerMUSE[0], centerMUSE[1]]:  # y,x
+#                 listObjInBlob.append(k)
+#                 listHSTObjInBlob.append(listHST_ID[k])
+#     return listObjInBlob, listHSTObjInBlob
+
+
+def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, subsegmap):
+    """Return the index and IDs of sources in the blobs.
 
     output
     ------
-    listObjInBlob : list of simple indices (from 0 to nb of sources in bounding box) of objects in the bounding box connected to the blob
-    listObjInBlob : list of catalog indices  of objects in the bounding box connected to the blob
+    listObjInBlob : list of simple indices (from 0 to nb of sources in
+    bounding box) of objects in the bounding box connected to the blob
+    listObjInBlob : list of catalog indices  of objects in the bounding
+    box connected to the blob
     """
-    listObjInBlob = [0]
-    listHSTObjInBlob = ['bg']
-    labelHR = _getLabel(subsegmap)
-    nbSources = np.max(labelHR) + 1
-    listHST_ID = ['bg'] + [int(subsegmap[labelHR == k][0])
-                           for k in range(1, nbSources)]
-    for k in range(1, len(listHST_ID)):
-        if listHST_ID[k] in keys_cat:
-            row = cat.loc['ID', listHST_ID[k]]
-            center = (row['DEC'], row['RA'])
-            centerMUSE = subimMUSE.wcs.sky2pix([center], nearest=True)[0]
-            if sub_blob_mask[centerMUSE[0], centerMUSE[1]]:  # y,x
-                listObjInBlob.append(k)
-                listHSTObjInBlob.append(listHST_ID[k])
+    listHST_ID = np.unique(subsegmap)
+    listHST_ID = listHST_ID[listHST_ID > 0]
+
+    subcat = cat.loc[idname, listHST_ID]
+    center = np.array([subcat['DEC'], subcat['RA']]).T
+    centerMUSE = subimMUSE.wcs.sky2pix(center, nearest=True).T
+    idx = sub_blob_mask[centerMUSE[0], centerMUSE[1]]
+
+    listObjInBlob = [0] + list(np.where(idx)[0] + 1)
+    listHSTObjInBlob = ['bg'] + list(listHST_ID[idx])
     return listObjInBlob, listHSTObjInBlob
+
 
 
 def convertBboxToHR(bbox, imHR, imLR):
