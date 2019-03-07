@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.stats as sst
 import scipy.signal as ssl
+from astropy.stats import mad_std
 from scipy.ndimage.morphology import grey_dilation
 
 
@@ -51,12 +52,12 @@ def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
     listMask = []
     for l in range(len(listSpe)):
         spe = listSpe[l]
-        sig = 1.489 * mad(spe)  # compute standard deviation estimator from MAD
+        sig = mad_std(spe)  # compute standard deviation estimator from MAD
 
         spe_filt = ssl.fftconvolve(
             spe, filt, mode='same')  # matched filter using filt
         # compute standard deviation estimator of filtered data from MAD
-        sig_filt = 1.489 * mad(spe_filt)
+        sig_filt = mad_std(spe_filt)
         lRejected = 0
 
         # find local extrema
@@ -123,8 +124,8 @@ def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
                 mask[a:b] = True
                 listMask.append(mask)
     if returnAll:
-        return listMask, lRejected, len(
-            listExtrema), nThresh, listExtrema, listArgExtrema, spe_filt, sig_filt, sig
+        return (listMask, lRejected, len(listExtrema), nThresh, listExtrema,
+                listArgExtrema, spe_filt, sig_filt, sig)
     return listMask
 
 
@@ -186,15 +187,4 @@ def calcWidth(spe, listKernel=None, n_sig=1, listWidth=np.arange(5, 42, 2)):
     listCorr = []
     for g in listKernel:
         listCorr.append(np.dot(spe, g))
-    res = listWidth[np.argmax(np.abs(listCorr))]
-    return res
-
-
-def mad(arr):
-    """ Median Absolute Deviation: a "Robust" version of standard deviation.
-        Indices variabililty of the sample.
-        https://en.wikipedia.org/wiki/Median_absolute_deviation
-    """
-    # arr = np.ma.array(arr).compressed()  # should be faster to not use masked arrays.
-    med = np.median(arr)
-    return np.median(np.abs(arr - med))
+    return listWidth[np.argmax(np.abs(listCorr))]
