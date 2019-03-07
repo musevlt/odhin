@@ -107,13 +107,12 @@ class ODHIN():
             self.cube, self.imHST, self.segmap, self.imMUSE, self.cat,
             self.main_kernel_transfert, params=self.params, verbose=verbose)
 
-        names = ('G_ID', 'nbSources', 'listIDs', 'Area', 'Xi2',
-                 'Condition Number')
+        names = ('G_ID', 'nbSources', 'listIDs', 'Area')
         groups = [[i, group.nbSources, tuple(group.listSources),
-                   group.region.area, 0, 0]
+                   group.region.area]
                   for i, group in enumerate(self.groups)]
         self.table_groups = Table(names=names, rows=groups,
-                                  dtype=(int, int, tuple, float, float, float))
+                                  dtype=(int, int, tuple, float))
         self.table_groups.add_index('G_ID')
 
     def deblend(self, listGroupToDeblend=None, cpu=None, verbose=True):
@@ -153,30 +152,30 @@ class ODHIN():
                     pass
 
             for i in listGroupToDeblend:
-                reg = self.groups[i].region
+                group = self.groups[i]
                 blob = (self.imLabel == i + 1)
                 # args: subcube, subhstimages, subsegmap, listObjInBlob,
                 # listHSTObjInBlob
                 args = prepare_inputs(
-                    self.cube, self.hstimages, self.segmap, blob, reg.bbox,
-                    self.imLabel, self.cat)
+                    self.cube, self.hstimages, self.segmap, blob,
+                    group.region.bbox, self.imLabel, self.cat)
                 outfile = str(self.output_dir / f'group_{i:05d}.fits')
                 pool.apply_async(deblendGroup,
-                                 args=args+(i, outfile), callback=update)
+                                 args=args+(group, outfile), callback=update)
 
             pool.close()
             pool.join()
         else:
             for i in listGroupToDeblend:
-                reg = self.groups[i].region
+                group = self.groups[i]
                 blob = (self.imLabel == i + 1)
                 # args: subcube, subhstimages, subsegmap, listObjInBlob,
                 # listHSTObjInBlob
                 args = prepare_inputs(
-                    self.cube, self.hstimages, self.segmap, blob, reg.bbox,
-                    self.imLabel, self.cat)
+                    self.cube, self.hstimages, self.segmap, blob,
+                    group.region.bbox, self.imLabel, self.cat)
                 outfile = str(self.output_dir / f'group_{i:05d}.fits')
-                deblendGroup(*args, i, outfile)
+                deblendGroup(*args, group, outfile)
 
         self.build_result_table()
 

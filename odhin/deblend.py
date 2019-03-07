@@ -18,11 +18,11 @@ from .deblend_utils import (convertFilt, _getLabel, convertIntensityMap,
 
 
 def deblendGroup(subcube, subhstimages, subsegmap, listObjInBlob,
-                 listHSTObjInBlob, group_id, outfile):
+                 listHSTObjInBlob, group, outfile):
     debl = Deblending(subcube, subhstimages)
     debl.createIntensityMap(subsegmap.data.filled(0.))
     debl.findSources()
-    debl.write(outfile, listObjInBlob, listHSTObjInBlob, group_id)
+    debl.write(outfile, listObjInBlob, listHSTObjInBlob, group)
 
 
 class Deblending():
@@ -457,15 +457,6 @@ class Deblending():
         return ['bg'] + [int(self.segmap[self.labelHR == k][0])
                          for k in range(1, self.nbSources)]
 
-    def getsp(self):
-        """
-        Get estimated spectra as a dict (with the HST ids as keys) of
-        mpdaf Spectra
-        """
-        return {key: Spectrum(data=self.sources[k], var=self.varSources[k],
-                              wave=self.cube.wave)
-                for k, key in enumerate(self.listHST_ID)}
-
     @property
     def Xi2_tot(self):
         return (1 / (np.size(self.residuals) - 3) *
@@ -486,34 +477,36 @@ class Deblending():
         mat /= mat.sum(axis=1)[:, None]
         return np.linalg.cond(mat)
 
-    def write(self, outfile, listObjInBlob, listHSTObjInBlob, group_id=0):
+    def write(self, outfile, listObjInBlob, listHSTObjInBlob, group):
         origin = ('Odhin', '1.0-beta2', self.cube.filename,
                   self.cube.primary_header.get('CUBE_V', ''))
-        src = Source.from_data(group_id, 0, 0, origin=origin)
+        src = Source.from_data(group.GID, 0, 0, origin=origin)
 
         cond_number = self.calcCondNumber(listObjInBlob)
+        src.header['GRP_ID'] = group.GID
+        src.header['GRP_AREA'] = group.region.area
+        src.header['GRP_NSRC'] = group.nbSources
         src.header['COND_NB'] = cond_number
         src.header['XI2_TOT'] = self.Xi2_tot
 
-        dic_spec = self.getsp()
-        dic_spec[f'bg_{group_id}'] = dic_spec.pop('bg')
-
-        # remove spectra from objects not in the blob
-        listKToRemove = []
-        for k in dic_spec.keys():
-            if k not in (listHSTObjInBlob + [f'bg_{group_id}']):
-                listKToRemove.append(k)
-        for k in listKToRemove:
-            dic_spec.pop(k)
-
-        src.spectra.update(dic_spec)
+        # add spectra, but remove spectra from objects not in the blob
+        for k, iden in enumerate(self.listHST_ID):
+            if iden == 'bg' or iden in listHSTObjInBlob:
+                sp = Spectrum(data=self.sources[k], var=self.varSources[k],
+                              wave=self.cube.wave, copy=False)
+                src.spectra[iden] = sp
 
         # build sources table
-        rows = [(self.listHST_ID[k], group_id, self.calcXi2_source(k),
-                 cond_number) for k in listObjInBlob]
-        t = Table(rows=rows, names=('ID', 'G_ID', 'Xi2', 'Condition Number'))
+        rows = [(self.listHST_ID[k], group.GID, self.calcXi2_source(k))
+                for k in listObjInBlob]
+        t = Table(rows=rows, names=('ID', 'G_ID', 'Xi2'))
+        t['Group Area'] = group.region.area
+        t['Number Sources'] = group.nbSources
+        t['Condition Number'] = cond_number
+        t['Xi2 Group'] = self.Xi2_tot
         src.tables['sources'] = t
 
+        # save cubes
         src.cubes['orig'] = self.cube
         src.cubes['estim'] = self.estimatedCube
 

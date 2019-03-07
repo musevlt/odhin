@@ -97,7 +97,8 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
 
 def ensureMinimalBbox(region, width, imLabel, min_sky_pixels, margin_bbox):
     """
-    Ensures that region respects a minimal area and contains at least `min_sky_pixels` sky pixels
+    Ensures that region respects a minimal area and contains at least
+    `min_sky_pixels` sky pixels
     """
     # First add margin around bounding box
     bbox = [0, 0, 0, 0]  # init
