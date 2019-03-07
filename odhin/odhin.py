@@ -9,10 +9,35 @@ import tqdm
 from astropy.table import Table, vstack
 from mpdaf import CPU
 
-from . import multi_deblend
-from .deblend_utils import calcMainKernelTransfert, get_fig_ax, cmap
-from .grouping import doGrouping
+from .deblend import deblendGroup
+from .deblend_utils import (calcMainKernelTransfert, get_fig_ax, cmap,
+                            extractHST)
+from .grouping import doGrouping, getObjsInBlob
 from .parameters import Params
+
+
+def prepare_inputs(cube, hstimages, segmap, blob_mask, bbox, imLabel, cat):
+    """
+    Extract data for each group before the multiprocessing (avoid large
+    datasets copies)
+    """
+    subcube = cube[:, bbox[0]:bbox[2], bbox[1]:bbox[3]]
+    subsegmap = extractHST(segmap, subcube[0])
+    subhstimages = [extractHST(hst, subcube[0]) for hst in hstimages]
+
+    for obj in [subcube, subsegmap] + subhstimages:
+        # need to copy some header infos, because wcs info are not
+        # completly copied during an image resize
+        obj.data_header.update(obj.wcs.to_header())
+
+    sub_blob_mask = blob_mask[bbox[0]:bbox[2], bbox[1]:bbox[3]]
+    imMUSE = cube[0]
+
+    subimMUSE = imMUSE[bbox[0]:bbox[2], bbox[1]:bbox[3]]
+    listObjInBlob, listHSTObjInBlob = getObjsInBlob(
+        'ID', cat, sub_blob_mask, subimMUSE, subsegmap.data.filled(0))
+
+    return subcube, subhstimages, subsegmap, listObjInBlob, listHSTObjInBlob
 
 
 class ODHIN():
@@ -132,11 +157,11 @@ class ODHIN():
                 blob = (self.imLabel == i + 1)
                 # args: subcube, subhstimages, subsegmap, listObjInBlob,
                 # listHSTObjInBlob
-                args = multi_deblend.getInputs(
+                args = prepare_inputs(
                     self.cube, self.hstimages, self.segmap, blob, reg.bbox,
                     self.imLabel, self.cat)
                 outfile = str(self.output_dir / f'group_{i:05d}.fits')
-                pool.apply_async(multi_deblend.deblendGroup,
+                pool.apply_async(deblendGroup,
                                  args=args+(i, outfile), callback=update)
 
             pool.close()
@@ -147,11 +172,11 @@ class ODHIN():
                 blob = (self.imLabel == i + 1)
                 # args: subcube, subhstimages, subsegmap, listObjInBlob,
                 # listHSTObjInBlob
-                args = multi_deblend.getInputs(
+                args = prepare_inputs(
                     self.cube, self.hstimages, self.segmap, blob, reg.bbox,
                     self.imLabel, self.cat)
                 outfile = str(self.output_dir / f'group_{i:05d}.fits')
-                multi_deblend.deblendGroup(*args, i, outfile)
+                deblendGroup(*args, i, outfile)
 
         self.build_result_table()
 

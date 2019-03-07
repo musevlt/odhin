@@ -17,6 +17,14 @@ from .deblend_utils import (convertFilt, _getLabel, convertIntensityMap,
                             getMainSupport, generatePSF_HST, getBlurKernel)
 
 
+def deblendGroup(subcube, subhstimages, subsegmap, listObjInBlob,
+                 listHSTObjInBlob, group_id, outfile):
+    debl = Deblending(subcube, subhstimages)
+    debl.createIntensityMap(subsegmap.data.filled(0.))
+    debl.findSources()
+    debl.write(outfile, listObjInBlob, listHSTObjInBlob, group_id)
+
+
 class Deblending():
     """
     Main class for deblending process
