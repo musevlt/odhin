@@ -231,6 +231,8 @@ class Deblending():
                     self.listYl[j].append([])
                     self.spatialMask[j].append([])
 
+                imin, imax = i * delta, (i + 1) * delta
+
                 # Do the estimation only if MUSE band is in HST band
                 if i in self.listBands[j]:
                     # Create intensity maps at MUSE resolution
@@ -257,15 +259,15 @@ class Deblending():
                     # Yvar : n x lmbda
 
                     U = intensityMapLRConvol.T
-                    Y = self.cubeLR[i * delta:(i + 1) * delta].reshape(
-                        self.cubeLR[i * delta:(i + 1) * delta].shape[0],
+                    Y = self.cubeLR[imin:imax].reshape(
+                        self.cubeLR[imin:imax].shape[0],
                         self.cubeLR.shape[1] * self.cubeLR.shape[2]).T
                     if regul:
-                        Y_c = self.cubeLR_c[i * delta:(i + 1) * delta].reshape(
-                            self.cubeLR[i * delta:(i + 1) * delta].shape[0],
+                        Y_c = self.cubeLR_c[imin:imax].reshape(
+                            self.cubeLR[imin:imax].shape[0],
                             self.cubeLR.shape[1] * self.cubeLR.shape[2]).T
-                    Yvar = self.cubeLRVar[i * delta:(i + 1) * delta].reshape(
-                        self.cubeLRVar[i * delta:(i + 1) * delta].shape[0],
+                    Yvar = self.cubeLRVar[imin:imax].reshape(
+                        self.cubeLRVar[imin:imax].shape[0],
                         self.cubeLRVar.shape[1] * self.cubeLRVar.shape[2]).T
 
                     # normalize intensity maps in flux to get flux-calibrated
@@ -290,10 +292,10 @@ class Deblending():
                                                Y_sig2=Y_sig2, filt_w=filt_w)
 
                         # get spectra estimation
-                        self.tmp_sources[j][1:, i * delta:(i + 1) * delta] = res[0]
+                        self.tmp_sources[j][1:, imin:imax] = res[0]
                         # for background spectrum get intercept (multiply by
                         # number of pixels to get tot flux)
-                        self.tmp_sources[j][0, i * delta:(i + 1) * delta] = res[1] * U.shape[0]
+                        self.tmp_sources[j][0, imin:imax] = res[1] * U.shape[0]
 
                         # store all elements for checking purposes
                         self.listAlphas[j][i] = res[8]
@@ -309,20 +311,20 @@ class Deblending():
                             self.listYc[j][i] = res[7]
 
                     else:  # use classical least squares solution
-                        self.tmp_sources[j][:, i * delta:(i + 1) * delta] = np.linalg.lstsq(U, Y)[0]
+                        self.tmp_sources[j][:, imin:imax] = np.linalg.lstsq(U, Y)[0]
 
                     # get spectra variance : as spectra is obtained by (U^T.U)^(-1).U^T.Y
                     # variance of estimated spectra is obtained by
                     # (U^T.U)^(-1).Yvar
                     Uinv = np.linalg.pinv(U)
-                    self.tmp_var[j][:, i * delta:(i + 1) * delta] = np.array(
+                    self.tmp_var[j][:, imin:imax] = np.array(
                         [np.sum(Uinv**2 * col, axis=1) for col in Yvar.T]).T
 
                     self.listIntensityMapLRConvol[j].append(
                         intensityMapLRConvol)
                 else:
-                    self.tmp_sources[j][:, i * delta:(i + 1) * delta] = 0
-                    self.tmp_var[j][:, i * delta:(i + 1) * delta] = 0
+                    self.tmp_sources[j][:, imin:imax] = 0
+                    self.tmp_var[j][:, imin:imax] = 0
                     self.listAlphas[j][i] = None
                     self.listRSS[j][i] = None
                     self.listCorrFlux[j][i] = None
@@ -404,23 +406,21 @@ class Deblending():
         """
         estimatedCube = np.zeros((self.cubeLR.shape[0],
                                   self.cubeLR.shape[1] * self.cubeLR.shape[2]))
-        delta = self.cubeLR.shape[0] / float(self.nBands)
+        delta = int(self.cubeLR.shape[0] / float(self.nBands))
 
         for i in range(self.nBands):
-            tmp = []
-            weightTot = np.sum([self.filtResp[l][int(i * delta):int((i + 1) * delta)]
-                                for l in range(len(self.filtResp))], axis=0)
+            imin, imax = i * delta, (i + 1) * delta
+            weightTot = np.sum([resp[imin:imax] for resp in self.filtResp],
+                               axis=0)
 
-            for j in range(len(self.filtResp)):
-                tmp.append(np.zeros_like(
-                    estimatedCube[int(i * delta):int((i + 1) * delta), :]))
-                tmp[j] = np.dot(
-                    tmp_sources[j][:, int(i * delta):int((i + 1) * delta)].T,
-                    self.listIntensityMapLRConvol[j][i])
+            estim = []
+            for j, resp in enumerate(self.filtResp):
+                tmp = np.dot(tmp_sources[j][:, imin:imax].T,
+                             self.listIntensityMapLRConvol[j][i])
+                arr = (resp[imin:imax] / weightTot)[:, np.newaxis] * tmp
+                estim.append(arr)
 
-            estimatedCube[int(i * delta):int((i + 1) * delta), :] = np.sum(
-                [(self.filtResp[l][int(i * delta):int((i + 1) * delta)] / weightTot)[:, np.newaxis] * tmp[l]
-                 for l in range(len(self.filtResp))], axis=0)
+            estimatedCube[imin:imax, :] = np.sum(estim, axis=0)
 
         estimatedCube = estimatedCube.reshape(self.cubeLR.shape)
         return estimatedCube
@@ -451,9 +451,6 @@ class Deblending():
         Get estimated spectra as a dict (with the HST ids as keys) of
         mpdaf Spectra
         """
-        cat = {}
-        for k, key in enumerate(self.listHST_ID):
-            cat[key] = Spectrum(data=self.sources[k], var=self.varSources[k],
-                                wave=self.cube.wave)
-
-        return cat
+        return {key: Spectrum(data=self.sources[k], var=self.varSources[k],
+                              wave=self.cube.wave)
+                for k, key in enumerate(self.listHST_ID)}
