@@ -4,6 +4,7 @@
 """
 
 import astropy.units as u
+import logging
 import math
 import numpy as np
 
@@ -545,15 +546,20 @@ def modifSegmap(segmap, cat):
     Avoid discrepancy between the catalog and the segmentation map
     (there are some segmap objects missing from the Rafelski 2015 catalog).
     """
-    segmap2 = segmap.copy()
-    keys_cat = cat['ID']
     keys = np.unique(segmap.data.data)
-    for k in keys:
-        if k not in keys_cat:
-            # to log somewhere
-            # print(k)
-            ####
+    keys = keys[keys > 0]
+    missing = keys[~np.in1d(keys, cat['ID'])]
+
+    if missing.size > 0:
+        logger = logging.getLogger(__name__)
+        logger.warning('found %d sources in segmap that are missing in the '
+                       'catalog', missing.size)
+        segmap2 = segmap.copy()
+        for k in missing:
             segmap2.data[segmap.data == k] = 0
+    else:
+        segmap2 = segmap
+
     return segmap2
 
 
