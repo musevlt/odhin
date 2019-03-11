@@ -34,6 +34,7 @@ def prepare_inputs(cube, hstimages, segmap, blob_mask, bbox, imLabel, cat):
     imMUSE = cube[0]
 
     subimMUSE = imMUSE[bbox[0]:bbox[2], bbox[1]:bbox[3]]
+    # __import__('pdb').set_trace()
     listObjInBlob, listHSTObjInBlob = getObjsInBlob(
         'ID', cat, sub_blob_mask, subimMUSE, subsegmap.data.filled(0))
 
@@ -126,6 +127,8 @@ class ODHIN():
         # if no special groups are listed, do on all groups
         if listGroupToDeblend is None:
             listGroupToDeblend = range(len(self.groups))
+
+        self.output_dir.mkdir(exist_ok=True)
 
         # Determine the number of processes:
         # - default: all CPUs except one.
@@ -226,6 +229,8 @@ class ODHIN():
                    levels=1, colors='r')
 
         src = group.listSources.copy()
+        if 'bg' in src:
+            src.remove('bg')
         cat = self.cat[np.in1d(self.cat['ID'], src)]
         y, x = subim.wcs.sky2pix(np.array([cat['DEC'], cat['RA']]).T).T
         ax.scatter(x, y, c="r")
