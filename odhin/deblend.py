@@ -17,12 +17,11 @@ from .deblend_utils import (convertFilt, _getLabel, convertIntensityMap,
                             getMainSupport, generatePSF_HST, getBlurKernel)
 
 
-def deblendGroup(subcube, subhstimages, subsegmap, listObjInBlob,
-                 listHSTObjInBlob, group, outfile):
+def deblendGroup(subcube, subhstimages, subsegmap, group, outfile):
     debl = Deblending(subcube, subhstimages)
     debl.createIntensityMap(subsegmap.data.filled(0.))
     debl.findSources()
-    debl.write(outfile, listObjInBlob, listHSTObjInBlob, group)
+    debl.write(outfile, group)
 
 
 class Deblending():
@@ -477,12 +476,12 @@ class Deblending():
         mat /= mat.sum(axis=1)[:, None]
         return np.linalg.cond(mat)
 
-    def write(self, outfile, listObjInBlob, listHSTObjInBlob, group):
+    def write(self, outfile, group):
         origin = ('Odhin', '1.0-beta2', self.cube.filename,
                   self.cube.primary_header.get('CUBE_V', ''))
         src = Source.from_data(group.GID, 0, 0, origin=origin)
 
-        cond_number = self.calcCondNumber(listObjInBlob)
+        cond_number = self.calcCondNumber(group.idxSources)
         src.header['GRP_ID'] = group.GID
         src.header['GRP_AREA'] = group.region.area
         src.header['GRP_NSRC'] = group.nbSources
@@ -491,14 +490,14 @@ class Deblending():
 
         # add spectra, but remove spectra from objects not in the blob
         for k, iden in enumerate(self.listHST_ID):
-            if iden == 'bg' or iden in listHSTObjInBlob:
+            if iden == 'bg' or iden in group.listSources:
                 sp = Spectrum(data=self.sources[k], var=self.varSources[k],
                               wave=self.cube.wave, copy=False)
                 src.spectra[iden] = sp
 
         # build sources table
         rows = [(self.listHST_ID[k], group.GID, self.calcXi2_source(k))
-                for k in listObjInBlob]
+                for k in group.idxSources]
         t = Table(rows=rows, names=('ID', 'G_ID', 'Xi2'))
         t['Group Area'] = group.region.area
         t['Number Sources'] = group.nbSources

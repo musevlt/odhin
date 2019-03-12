@@ -12,16 +12,15 @@ from mpdaf import CPU
 from .deblend import deblendGroup
 from .deblend_utils import (calcMainKernelTransfert, get_fig_ax, cmap,
                             extractHST)
-from .grouping import doGrouping, getObjsInBlob
+from .grouping import doGrouping
 from .parameters import Params
 
 
-def prepare_inputs(cube, hstimages, segmap, blob_mask, bbox, imLabel, cat):
+def prepare_inputs(cube, hstimages, segmap, region):
+    """Extract data for each group before the multiprocessing (avoid large
+    datasets copies).
     """
-    Extract data for each group before the multiprocessing (avoid large
-    datasets copies)
-    """
-    subcube = cube[:, bbox[0]:bbox[2], bbox[1]:bbox[3]]
+    subcube = cube[:, region.sy, region.sx]
     subsegmap = extractHST(segmap, subcube[0])
     subhstimages = [extractHST(hst, subcube[0]) for hst in hstimages]
 
@@ -30,15 +29,7 @@ def prepare_inputs(cube, hstimages, segmap, blob_mask, bbox, imLabel, cat):
         # completly copied during an image resize
         obj.data_header.update(obj.wcs.to_header())
 
-    sub_blob_mask = blob_mask[bbox[0]:bbox[2], bbox[1]:bbox[3]]
-    imMUSE = cube[0]
-
-    subimMUSE = imMUSE[bbox[0]:bbox[2], bbox[1]:bbox[3]]
-    # __import__('pdb').set_trace()
-    listObjInBlob, listHSTObjInBlob = getObjsInBlob(
-        'ID', cat, sub_blob_mask, subimMUSE, subsegmap.data.filled(0))
-
-    return subcube, subhstimages, subsegmap, listObjInBlob, listHSTObjInBlob
+    return subcube, subhstimages, subsegmap
 
 
 class ODHIN():
@@ -130,6 +121,15 @@ class ODHIN():
 
         self.output_dir.mkdir(exist_ok=True)
 
+        to_process = []
+        for i in listGroupToDeblend:
+            group = self.groups[i]
+            # args: subcube, subhstimages, subsegmap
+            args = prepare_inputs(self.cube, self.hstimages, self.segmap,
+                                  group.region)
+            outfile = str(self.output_dir / f'group_{group.GID:05d}.fits')
+            to_process.append((*args, group, outfile))
+
         # Determine the number of processes:
         # - default: all CPUs except one.
         # - mdaf.CPU
@@ -154,31 +154,14 @@ class ODHIN():
                 def update(*a):
                     pass
 
-            for i in listGroupToDeblend:
-                group = self.groups[i]
-                blob = (self.imLabel == i + 1)
-                # args: subcube, subhstimages, subsegmap, listObjInBlob,
-                # listHSTObjInBlob
-                args = prepare_inputs(
-                    self.cube, self.hstimages, self.segmap, blob,
-                    group.region.bbox, self.imLabel, self.cat)
-                outfile = str(self.output_dir / f'group_{i:05d}.fits')
-                pool.apply_async(deblendGroup,
-                                 args=args+(group, outfile), callback=update)
+            for args in to_process:
+                pool.apply_async(deblendGroup, args=args, callback=update)
 
             pool.close()
             pool.join()
         else:
-            for i in listGroupToDeblend:
-                group = self.groups[i]
-                blob = (self.imLabel == i + 1)
-                # args: subcube, subhstimages, subsegmap, listObjInBlob,
-                # listHSTObjInBlob
-                args = prepare_inputs(
-                    self.cube, self.hstimages, self.segmap, blob,
-                    group.region.bbox, self.imLabel, self.cat)
-                outfile = str(self.output_dir / f'group_{i:05d}.fits')
-                deblendGroup(*args, group, outfile)
+            for args in to_process:
+                deblendGroup(*args)
 
         self.build_result_table()
 
@@ -208,7 +191,8 @@ class ODHIN():
         if groups is None:
             groups = self.groups
         for group in groups:
-            minr, minc, maxr, maxc = group.region.bbox
+            minr, maxr = group.region.sy.start, group.region.sy.stop
+            minc, maxc = group.region.sx.start, group.region.sx.stop
             rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr,
                                       fill=False, edgecolor='red',
                                       linewidth=linewidth)
@@ -222,10 +206,10 @@ class ODHIN():
         assert group_id is not None
         ax = get_fig_ax(ax)
         group = self.groups[group_id]
-        minr, minc, maxr, maxc = group.region.bbox
-        subim = self.imMUSE[minr:maxr, minc:maxc]
+        reg = group.region
+        subim = self.imMUSE[reg.sy, reg.sx]
         subim.plot(ax=ax)
-        ax.contour(self.imLabel[minr:maxr, minc:maxc] == group_id + 1,
+        ax.contour(self.imLabel[reg.sy, reg.sx] == group_id + 1,
                    levels=1, colors='r')
 
         src = group.listSources.copy()
