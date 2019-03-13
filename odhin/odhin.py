@@ -166,7 +166,7 @@ class ODHIN():
         self.build_result_table()
 
     def build_result_table(self):
-        tables = [Table.read(f, hdu='TAB_SOURCE')
+        tables = [Table.read(f, hdu='TAB_SOURCES')
                   for f in self.output_dir.glob('group_*.fits')]
         self.table_sources = vstack(tables)
         return self.table_sources

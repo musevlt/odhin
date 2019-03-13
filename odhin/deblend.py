@@ -486,7 +486,9 @@ class Deblending:
                 src.spectra[iden] = sp
 
         # build sources table
-        rows = [(self.listHST_ID[k], group.GID, self.calcXi2_source(k))
+        ids = [f'bg_{group.GID}' if id_ == 'bg' else id_
+               for id_ in self.listHST_ID]
+        rows = [(ids[k], group.GID, self.calcXi2_source(k))
                 for k in group.idxSources]
         t = Table(rows=rows, names=('ID', 'G_ID', 'Xi2'))
         t['Group Area'] = group.region.area
@@ -496,7 +498,8 @@ class Deblending:
         src.tables['sources'] = t
 
         # save cubes
-        src.cubes['orig'] = self.cube
-        src.cubes['estim'] = self.estimatedCube
+        src.cubes['MUSE'] = self.cube
+        src.cubes['FITTED'] = self.estimatedCube
+        src.images['MUSE_WHITE'] = self.cube.mean(axis=0)
 
         src.write(outfile)
