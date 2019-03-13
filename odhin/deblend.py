@@ -357,10 +357,8 @@ class Deblending:
         Generate HST-MUSE transfer PSF
         """
         hst = self.listImagesHR[0]
-
         dy, dx = hst.get_step(unit=units.arcsec)
-
-        shape = np.asarray(hst.shape).astype(int)
+        shape = np.array(hst.shape)
 
         # get odd shape
         shape_1 = shape // 2 * 2 + 1
@@ -375,6 +373,7 @@ class Deblending:
             (2.0**(1.0 / self.params.beta_hst) - 1.0)
         psf_hst = 1.0 / (1.0 + rsq / asq_hst)**self.params.beta_hst
         psf_hst = psf_hst / np.sum(psf_hst)
+        # FIXME: use Moffat(rsq, asq_hst, self.params.beta_hst) ?
 
         listTransferKernel = []
         for fwhm in self.listFWHM:
