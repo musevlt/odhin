@@ -13,7 +13,7 @@ from mpdaf.sdetect import Source
 
 from .regularization import regulDeblendFunc, medfilt
 from .parameters import Params
-from .deblend_utils import (convertFilt, _getLabel, convertIntensityMap,
+from .deblend_utils import (convertFilt, convertIntensityMap,
                             getMainSupport, generatePSF_HST, getBlurKernel)
 
 
@@ -24,7 +24,7 @@ def deblendGroup(subcube, subhstimages, subsegmap, group, outfile):
     debl.write(outfile, group)
 
 
-class Deblending():
+class Deblending:
     """
     Main class for deblending process
 
@@ -64,23 +64,22 @@ class Deblending():
         if params is None:
             params = Params()
         self.params = params
-        self.HSTImages = HSTImages
         self.cubeLR = cube.data.filled(np.ma.median(cube.data))
         self.cubeLRVar = cube.var.filled(np.ma.median(cube.var))
         self.wcs = cube.wcs
         self.wave = cube.wave
-        self.listImagesHR = [hst for hst in HSTImages]
-        l_min, l_max = cube.wave.get_range()
+        self.listImagesHR = HSTImages
 
         # get FSF parameters
-        self.fsf_a = self.params.fsf_a_muse
-        self.fsf_b = self.params.fsf_b_muse
+        fsf_a = self.params.fsf_a_muse
+        fsf_b = self.params.fsf_b_muse
         self.fsf_beta_muse = self.params.fsf_beta_muse
 
         self.nBands = self.params.nBands
-        dl = (l_min - l_max) / self.nBands
-        self.listFWHM = [self.fsf_a + self.fsf_b * (l + dl)
-                         for l in np.linspace(l_min, l_max, self.nBands)]
+        l_min, l_max = cube.wave.get_range()
+        self.bands_wl = lb = np.linspace(l_min, l_max, self.nBands + 1)
+        self.bands_center = np.mean([lb[:-1], lb[1:]], axis=0)
+        self.listFWHM = fsf_a + fsf_b * self.bands_wl
 
         if self.params.listFiltName is not None:
             self.filtResp = [convertFilt(np.loadtxt(filtName), self.wave)
@@ -106,20 +105,19 @@ class Deblending():
         self.listBands = self._getListBands(self.nBands, self.filtResp)
 
     def _getListBands(self, nBands, filtResp):
-        """
-        For each HST band, get the list of all MUSE bands inside it
+        """For each HST band, get the list of all MUSE bands inside it (if one
+        of the band limits has filter values > 0).
         """
         listBands = []
-        lmbda = len(filtResp[0])
+        nl = len(filtResp[0])
+        lind = list(np.linspace(0, nl-1, nBands+1, dtype=int))
         for i in range(len(filtResp)):
-            listBands.append([])
-            for j in range(nBands):
-                if (filtResp[i][j * lmbda // nBands] != 0) or (
-                        filtResp[i][np.minimum((j + 1) * lmbda // nBands, lmbda - 1)] != 0):
-                    listBands[i].append(j)
+            val = filtResp[i][lind]
+            bands_idx = np.where((val[:-1] > 0) | (val[1:] > 0))
+            listBands.append(list(bands_idx[0]))
         return listBands
 
-    def createIntensityMap(self, segmap=None, thresh=None):
+    def createIntensityMap(self, segmap, thresh=None):
         """
         Create intensity maps from HST images and segmentation map.
         To be called before calling findSources()
@@ -133,36 +131,35 @@ class Deblending():
 
         """
 
-        # labelisation
         self.segmap = segmap
-        if segmap is None:
-            # FIXME: this will break with _getLabel ?
-            self.labelHR = _getLabel(self.listImagesHR[0].data, thresh)
-        else:
-            self.labelHR = _getLabel(segmap=segmap)
+
+        # List of all HST ids in the segmap
+        hst_ids = np.unique(segmap)
+        hst_ids = hst_ids[hst_ids > 0]
+        self.listHST_ID = ['bg'] + sorted(hst_ids)
+
+        # Create a new segmap with contiguous indices
+        self.labelHR = np.zeros(segmap.shape, dtype=int)
+        for i, k in enumerate(hst_ids):
+            self.labelHR[segmap == k] = i
+
         self.nbSources = np.max(self.labelHR) + 1  # add one for background
-
-        self.listHST_ID = self._getHST_ID()
-
         self.listIntensityMapHR = []
 
         # for each HST filter, create the high resolution intensity matrix
-        # (nbSources x Nb pixels )
-        for j in range(len(self.listImagesHR)):
-            intensityMapHR = np.zeros(
-                (self.nbSources,
-                 self.listImagesHR[0].shape[0] *
-                 self.listImagesHR[0].shape[1]))
-            mask = np.zeros(self.listImagesHR[0].shape)
+        # (nbSources x Nb pixels)
+        for im in self.listImagesHR:
+            intensityMapHR = np.zeros((self.nbSources, np.prod(im.shape)))
+            mask = np.zeros(im.shape)
 
             # put intensityMap of background in first position (estimated
             # spectrum of background will also be first)
             intensityMapHR[0] = 1.
 
-            for k in range(1, np.max(self.labelHR) + 1):
+            for k in range(1, self.nbSources):
                 # avoid negative abundances
                 mask[self.labelHR == k] = np.maximum(
-                    self.listImagesHR[j].data[self.labelHR == k], 10**(-9))
+                    im.data[self.labelHR == k], 10**(-9))
                 intensityMapHR[k] = mask.copy().flatten()
                 mask[:] = 0
 
@@ -189,8 +186,9 @@ class Deblending():
         # considered
         self.listTransferKernel = self._generateHSTMUSE_transfer_PSF()
 
-        self.sources = np.zeros((self.nbSources, self.cubeLR.shape[0]))
-        self.varSources = np.zeros((self.nbSources, self.cubeLR.shape[0]))
+        shapeLR = (self.nbSources, self.cubeLR.shape[0])
+        # self.sources = np.zeros((self.nbSources, self.cubeLR.shape[0]))
+        # self.varSources = np.zeros((self.nbSources, self.cubeLR.shape[0]))
         self.listIntensityMapLRConvol = []
         self.tmp_sources = []
         self.tmp_var = []
@@ -222,8 +220,8 @@ class Deblending():
                 self.listYl.append([])
                 self.spatialMask.append([])
 
-            self.tmp_sources.append(np.zeros_like(self.sources))
-            self.tmp_var.append(np.zeros_like(self.sources))
+            self.tmp_sources.append(np.zeros(shapeLR))
+            self.tmp_var.append(np.zeros(shapeLR))
 
             self.listIntensityMapLRConvol.append([])
 
@@ -395,15 +393,19 @@ class Deblending():
         """
         Combine spectra estimated on each HST image
         """
-        weigthTot = np.sum([self.filtResp[j]
-                            for j in range(len(self.filtResp))], axis=0)
-        for i in range(self.nbSources):
-            self.sources[i] = np.sum([
-                self.filtResp[j] * self.tmp_sources[j][i]
-                for j in range(len(self.filtResp))], axis=0) / weigthTot
-            self.varSources[i] = np.sum([
-                self.filtResp[j] * self.tmp_var[j][i]
-                for j in range(len(self.filtResp))], axis=0) / weigthTot
+        weigthTot = np.sum(self.filtResp, axis=0)
+        # for i in range(self.nbSources):
+        #     self.sources[i] = np.sum([
+        #         self.filtResp[j] * self.tmp_sources[j][i]
+        #         for j in range(len(self.filtResp))], axis=0) / weigthTot
+        #     self.varSources[i] = np.sum([
+        #         self.filtResp[j] * self.tmp_var[j][i]
+        #         for j in range(len(self.filtResp))], axis=0) / weigthTot
+
+        self.sources = np.sum(np.array(self.filtResp)[:, None, :]
+                              * self.tmp_sources, axis=0) / weigthTot
+        self.varSources = np.sum(np.array(self.filtResp)[:, None, :]
+                                 * self.tmp_var, axis=0) / weigthTot
 
         # for background, get voxel mean instead of sum
         self.sources[0] = self.sources[0] / self.cubeLR.size
@@ -447,14 +449,6 @@ class Deblending():
         self.tmp_sourcesCont = [ssl.medfilt(tmp_source, kernel_size=(1, w))
                                 for tmp_source in self.tmp_sources]
         self.estimatedCubeCont = self._rebuildCube(self.tmp_sourcesCont)
-
-    def _getHST_ID(self):
-        """
-        Get the list of HST ids for each label of labelHR (first is
-        background 'bg')
-        """
-        return ['bg'] + [int(self.segmap[self.labelHR == k][0])
-                         for k in range(1, self.nbSources)]
 
     @property
     def Xi2_tot(self):

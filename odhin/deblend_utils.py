@@ -5,7 +5,6 @@
 
 import astropy.units as u
 import logging
-import math
 import numpy as np
 
 from photutils import create_matching_kernel, TopHatWindow, SegmentationImage
@@ -56,17 +55,13 @@ def generatePSF_HST(alphaHST, betaHST, shape=(375, 375), shapeMUSE=(25, 25)):
     To increase precision (as this PSF is sharp) the construction is made on
     a larger array then subsampled.
     """
-    PSF_HST_HR = generateMoffatIm(
-        shape=shape,
-        center=(shape[0] // 2, shape[1] // 2),
-        alpha=alphaHST,
-        beta=betaHST,
-        dim=None,
-    )
+    PSF_HST_HR = generateMoffatIm(shape=shape,
+                                  center=(shape[0] // 2, shape[1] // 2),
+                                  alpha=alphaHST, beta=betaHST, dim=None)
     factor = (shape[0] // shapeMUSE[0], shape[1] // shapeMUSE[1])
     PSF_HST = block_sum(PSF_HST_HR, (factor[0], factor[1]))
     PSF_HST[PSF_HST < 0.001] = 0
-    PSF_HST = PSF_HST / np.sum(PSF_HST)
+    PSF_HST /= np.sum(PSF_HST)
     return PSF_HST
 
 
@@ -142,10 +137,10 @@ def calcFSF(a, b, beta, listLambda, center=(12, 12), shape=(25, 25), dim="MUSE")
 
 
 def Moffat(r, alpha, beta):
+    """Compute Moffat values for array of distances *r* and Moffat
+    parameters *alpha* and *beta*.
     """
-    Compute Moffat values for array of distances *r* and Moffat parameters *alpha* and *beta*
-    """
-    return (beta - 1) / (math.pi * alpha ** 2) * (1 + (r / alpha) ** 2) ** (-beta)
+    return (beta - 1) / (np.pi * alpha ** 2) * (1 + (r / alpha) ** 2) ** (-beta)
 
 
 def generateMoffatIm(center=(12, 12), shape=(25, 25), alpha=2, beta=2.5,
@@ -156,13 +151,14 @@ def generateMoffatIm(center=(12, 12), shape=(25, 25), alpha=2, beta=2.5,
     MUSE pixel. a,b allow to decenter slightly the Moffat image.
     """
     ind = np.indices(shape)
-    r = np.sqrt(((ind[0] - center[0] + dx) ** 2 + ((ind[1] - center[1] + dy)) ** 2))
+    r = np.sqrt(((ind[0] - center[0] + dx) ** 2 +
+                 (ind[1] - center[1] + dy) ** 2))
     if dim == "MUSE":
         r = r * 0.2
     elif dim == "HST":
         r = r * 0.03
     res = Moffat(r, alpha, beta)
-    res = res / np.sum(res)
+    res /= np.sum(res)
     return res
 
 
@@ -450,19 +446,6 @@ def getBlurKernel(imHR, imLR, sizeKer, returnImBlurred=False, cut=0.00001):
         return kernel, imLRsynth
 
     return kernel
-
-
-def _getLabel(segmap=None):
-    """
-    Create a new segmap with contiguous indices
-    """
-    label_image = np.zeros(segmap.shape, dtype='int')
-    i = 0
-    for k in sorted(set(segmap.flatten())):
-        label_image[segmap == k] = i
-        i = i + 1
-
-    return label_image
 
 
 def calcMainKernelTransfert(params, imHST):
