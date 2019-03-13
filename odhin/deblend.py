@@ -16,6 +16,7 @@ from .regularization import regulDeblendFunc
 from .parameters import Params
 from .deblend_utils import (convertFilt, convertIntensityMap,
                             getMainSupport, generatePSF_HST, getBlurKernel)
+from .version import __version__
 
 
 def deblendGroup(subcube, subhstimages, subsegmap, group, outfile):
@@ -467,7 +468,7 @@ class Deblending:
         return np.linalg.cond(mat)
 
     def write(self, outfile, group):
-        origin = ('Odhin', '1.0-beta2', self.cube.filename,
+        origin = ('Odhin', __version__, self.cube.filename,
                   self.cube.primary_header.get('CUBE_V', ''))
         src = Source.from_data(group.GID, 0, 0, origin=origin)
 
