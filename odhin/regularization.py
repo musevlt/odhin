@@ -343,24 +343,6 @@ def _decomp_diag(v_prime, Q):
     return (v_prime * Q ** 2).sum(axis=-1)
 
 
-def medfilt(x, k):
-    """Apply a length-k median filter to a 1D array x.
-    Boundaries are extended by symmetry (instead of zeros like scipy medfilt).
-    """
-    assert k % 2 == 1, "Median filter length must be odd."
-    assert x.ndim == 1, "Input must be one-dimensional."
-    k2 = (k - 1) // 2
-    y = np.zeros((len(x), k), dtype=x.dtype)
-    y[:, k2] = x
-    for i in range(k2):
-        j = k2 - i
-        y[j:, i] = x[:-j]
-        y[:j, i] = x[:j][::-1]
-        y[:-j, -(i + 1)] = x[j:]
-        y[-j:, -(i + 1)] = x[len(x) - j:][::-1]
-    return np.median(y, axis=1)
-
-
 def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
                      alpha_c=0.0001, support=None, trueLines=None,
                      alphas=np.logspace(-5, 2, 50), filt_w=101, Y_sig2=None):

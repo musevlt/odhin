@@ -10,8 +10,9 @@ import scipy.signal as ssl
 from astropy.table import Table
 from mpdaf.obj import Spectrum
 from mpdaf.sdetect import Source
+from scipy.ndimage import median_filter
 
-from .regularization import regulDeblendFunc, medfilt
+from .regularization import regulDeblendFunc
 from .parameters import Params
 from .deblend_utils import (convertFilt, convertIntensityMap,
                             getMainSupport, generatePSF_HST, getBlurKernel)
@@ -175,12 +176,8 @@ class Deblending:
         filt_w = self.params.filt_w
         if regul:
             # precompute continuum
-            shape = self.cubeLR.shape
-            self.cubeLR_c = np.vstack([
-                medfilt(y, filt_w)
-                for y in self.cubeLR.reshape(
-                    shape[0], shape[1] * shape[2]).T
-            ]).T.reshape(shape)
+            self.cubeLR_c = median_filter(self.cubeLR, size=(filt_w, 1, 1),
+                                          mode='reflect')
 
         # compute HST-MUSE transfer functions for all MUSE FSF fwhm
         # considered
