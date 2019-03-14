@@ -8,7 +8,7 @@ import logging
 import numpy as np
 
 from astropy.table import Table, vstack
-from photutils import create_matching_kernel, TopHatWindow, SegmentationImage
+from photutils import create_matching_kernel, TopHatWindow
 from scipy import ndimage
 from scipy.interpolate import interp1d
 from scipy.signal import fftconvolve
@@ -144,8 +144,8 @@ def convertIntensityMap(intensityMap, muse, hst, fwhm, beta, imPSFMUSE):
 
     imPSFMUSE = imPSFMUSE / np.sum(imPSFMUSE)
     for i in range(intensityMap.shape[0]):
-        # hst_ref.data = intensityMap[i].reshape(hst_ref.shape)
-        hst_ref.data = fftconvolve(intensityMap[i], imPSFMUSE, mode="same")
+        hst_ref.data = intensityMap[i].reshape(hst_ref.shape)
+        hst_ref.data = fftconvolve(hst_ref.data, imPSFMUSE, mode="same")
         hst_ref_muse = hst_ref.align_with_image(
             muse, cutoff=0.0, flux=True, inplace=False, antialias=False)
         hst_ref_muse = rescale_hst_like_muse(hst_ref_muse, muse, inplace=True)
@@ -393,19 +393,7 @@ def createIntensityMap(imHR, segmap, imLR, kernel_transfert, params=None):
         # FIXME: params = Params()
         raise ValueError('this case is not implemented!')
 
-    # create image of label reindexed squentially from 0 to nSources
-    # FIXME: why ?
-    segmapIm = SegmentationImage(segmap.data)
-    try:
-        # new method in photutils v0.5
-        relabel_func = segmapIm.relabel_consecutive
-    except AttributeError:
-        # old method
-        relabel_func = segmapIm.relabel_sequential
-
-    relabel_func()
-    labelHR = segmapIm.data
-
+    labelHR = segmap.data
     intensityMapHR = np.zeros(imHR.shape)
     # avoid negative abundances
     sel = labelHR > 0
