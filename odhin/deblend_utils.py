@@ -7,6 +7,7 @@ import astropy.units as u
 import logging
 import numpy as np
 
+from astropy.table import Table, vstack
 from photutils import create_matching_kernel, TopHatWindow, SegmentationImage
 from scipy import ndimage
 from scipy.interpolate import interp1d
@@ -143,69 +144,18 @@ def convertIntensityMap(intensityMap, muse, hst, fwhm, beta, imPSFMUSE):
 
     imPSFMUSE = imPSFMUSE / np.sum(imPSFMUSE)
     for i in range(intensityMap.shape[0]):
-        hst_ref.data = intensityMap[i].reshape(hst_ref.shape)
-
-        hst_ref.data = fftconvolve(hst_ref.data, imPSFMUSE, mode="same")
-        hst_ref_muse = regrid_hst_like_muse(hst_ref, muse, inplace=False,
-                                            antialias=False)
+        # hst_ref.data = intensityMap[i].reshape(hst_ref.shape)
+        hst_ref.data = fftconvolve(intensityMap[i], imPSFMUSE, mode="same")
+        hst_ref_muse = hst_ref.align_with_image(
+            muse, cutoff=0.0, flux=True, inplace=False, antialias=False)
         hst_ref_muse = rescale_hst_like_muse(hst_ref_muse, muse, inplace=True)
         hst_ref_muse.mask[:] = False
-
         intensityMapMuse[i] = hst_ref_muse.data.flatten()
+
     return intensityMapMuse
 
 
 # functions taken from muse_analysis and slighlty modified
-
-
-def regrid_hst_like_muse(hst, muse, inplace=True, antialias=False):
-    """
-    Resample an HST image onto the spatial coordinate grid of a given
-    MUSE image or MUSE cube.
-
-    Parameters
-    ----------
-    hst : `mpdaf.obj.Image`
-       The HST image to be resampled.
-    muse : `mpdaf.obj.Image` of `mpdaf.obj.Cube`
-       The MUSE image or cube to use as the template for the HST image.
-    inplace : bool
-       (This defaults to True, because HST images tend to be large)
-       If True, replace the contents of the input HST image object
-       with the resampled image.
-       If False, return a new Image object that contains the resampled
-       image.
-
-    Returns
-    -------
-    out : `mpdaf.obj.Image`
-       The resampled HST image.
-
-    """
-
-    # Operate on a copy of the input image?
-
-    if not inplace:
-        hst = hst.copy()
-
-    # If a MUSE cube was provided, extract a single-plane image to use
-    # as the template.
-
-    if muse.ndim > 2:
-        muse = muse[0, :, :]
-
-    # Mask the zero-valued blank margins of the HST image.
-
-    # "
-    # Removed here because we work on intensity maps with lot of zeros
-    # np.ma.masked_inside(hst.data, -1e-10, 1e-10, copy=False)
-    #########
-
-    # Resample the HST image onto the same coordinate grid as the MUSE
-    # image.
-    return hst.align_with_image(
-        muse, cutoff=0.0, flux=True, inplace=False, antialias=antialias
-    )
 
 
 class HstFilterInfo(object):
@@ -444,6 +394,7 @@ def createIntensityMap(imHR, segmap, imLR, kernel_transfert, params=None):
         raise ValueError('this case is not implemented!')
 
     # create image of label reindexed squentially from 0 to nSources
+    # FIXME: why ?
     segmapIm = SegmentationImage(segmap.data)
     try:
         # new method in photutils v0.5
@@ -456,8 +407,9 @@ def createIntensityMap(imHR, segmap, imLR, kernel_transfert, params=None):
     labelHR = segmapIm.data
 
     intensityMapHR = np.zeros(imHR.shape)
-    intensityMapHR[labelHR > 0] = np.maximum(
-        imHR.data[segmap.data > 0], 10**(-9))  # avoid negative abundances
+    # avoid negative abundances
+    sel = labelHR > 0
+    intensityMapHR[sel] = np.maximum(imHR.data[sel], 10**(-9))
 
     intensityMapLRConvol = convertIntensityMap(
         intensityMapHR[None, :], imLR, imHR, params.fwhm_muse,
@@ -467,10 +419,14 @@ def createIntensityMap(imHR, segmap, imLR, kernel_transfert, params=None):
     return intensityMapLRConvol
 
 
-def modifSegmap(segmap, cat):
-    """
+def check_segmap_catalog(segmap, cat):
+    """Check that segmap and catalog are consistent and fix if needed.
+
     Avoid discrepancy between the catalog and the segmentation map
-    (there are some segmap objects missing from the Rafelski 2015 catalog).
+    (there are some segmap objects missing from the Rafelski 2015 catalog). If
+    some sources are found in the segmap but are missing in the catalog, then
+    additionnal rows with new IDs are added to the catalog.
+
     """
     keys = np.unique(segmap.data.data)
     keys = keys[keys > 0]
@@ -479,14 +435,19 @@ def modifSegmap(segmap, cat):
     if missing.size > 0:
         logger = logging.getLogger(__name__)
         logger.warning('found %d sources in segmap that are missing in the '
-                       'catalog', missing.size)
-        segmap2 = segmap.copy()
-        for k in missing:
-            segmap2.data[segmap.data == k] = 0
-    else:
-        segmap2 = segmap
+                       'catalog (ID: %s), adding them to the catalog',
+                       missing.size, missing)
+        coords = []
+        for iden in missing:
+            center = np.mean(np.where(segmap.data.data == iden), axis=1)
+            coords.append(segmap.wcs.pix2sky(center)[0])
+        dec, ra = zip(*coords)
+        cat2 = Table([missing, ra, dec], names=('ID', 'RA', 'DEC'))
+        cat2['MISSING_SOURCE'] = True
+        cat = vstack([cat, cat2])
+        cat.add_index('ID')
 
-    return segmap2
+    return cat
 
 
 # def get_cat_from_segmap(segmap):

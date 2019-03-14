@@ -11,7 +11,7 @@ from mpdaf import CPU
 
 from .deblend import deblendGroup
 from .deblend_utils import (calcMainKernelTransfert, get_fig_ax, cmap,
-                            extractHST)
+                            extractHST, check_segmap_catalog)
 from .grouping import doGrouping
 from .parameters import Params
 
@@ -86,6 +86,10 @@ class ODHIN():
         # if nothing provided build transfer kernel from default parameters
         self.main_kernel_transfert = main_kernel_transfert or \
             calcMainKernelTransfert(self.params, self.imHST)
+
+        # needed because of potential discrepancy between the catalog and the
+        # segmentation map (as in Rafelski15)
+        self.cat = check_segmap_catalog(self.segmap, self.cat)
 
     def grouping(self, verbose=True, cut=None):
         """

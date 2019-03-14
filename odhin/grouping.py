@@ -11,7 +11,7 @@ import numpy as np
 from skimage.measure import regionprops, label
 from tqdm import tqdm
 
-from .deblend_utils import createIntensityMap, modifSegmap
+from .deblend_utils import createIntensityMap
 
 
 class SourceGroup:
@@ -96,10 +96,6 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
     Segment all sources in a number of connected (at the MUSE resolution)
     groups
     """
-    # needed because of potential discrepancy between the catalog and the
-    # segmentation map (as in Rafelski15)
-    segmap = modifSegmap(segmap, cat)
-
     intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE,
                                               kernel_transfert, params)
 
