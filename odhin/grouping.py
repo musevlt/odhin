@@ -7,6 +7,7 @@ Store methods for
 - modifying groups
 """
 
+import logging
 import numpy as np
 from skimage.measure import regionprops, label
 from tqdm import tqdm
@@ -96,6 +97,7 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
     Segment all sources in a number of connected (at the MUSE resolution)
     groups
     """
+    logger = logging.getLogger(__name__)
     intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE,
                                               kernel_transfert, params)
 
@@ -118,7 +120,13 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
         subimMUSE = imMUSE[region.sy, region.sx]
         idx, sources = getObjsInBlob('ID', cat, sub_blob_mask, subimMUSE,
                                      subsegmap)
-        groups.append(SourceGroup(skreg.label - 1, sources, idx, region))
+        if len(sources) == 1:
+            # FIXME: this should not happen. It seems to happen when a source
+            # is close to an edge, and because the HR to LR resampling remove
+            # the source flux on the edge spaxels. Should investigate more!
+            logger.warning('found no sources in group %d', skreg.label - 1)
+        else:
+            groups.append(SourceGroup(skreg.label - 1, sources, idx, region))
 
     return groups, imLabel
 
