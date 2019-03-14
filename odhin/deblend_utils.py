@@ -461,7 +461,7 @@ def extractHST(imHST, imMUSE, rot=True):
         pa_muse = imMUSE.get_rot()
         pa_hst = imHST.get_rot()
         if np.abs(pa_muse - pa_hst) > 1.e-3:
-            imHST_tmp = imHST.subimage(center, ext_size)
+            imHST_tmp = imHST.subimage(center, ext_size, minsize=0)
             imHST = imHST_tmp.rotate(imMUSE.get_rot())
 
-    return imHST.subimage(center, size)
+    return imHST.subimage(center, size, minsize=0)
