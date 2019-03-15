@@ -2,9 +2,10 @@ from setuptools import setup, find_packages
 
 setup(
     name='odhin',
-    version='1.0-beta2',
-    install_requires=['scikit-learn', 'scipy', 'numpy', 'matplotlib', 'astropy', 'mpdaf',
-                      'adjustText', 'termcolor', 'photutils','tqdm'],
+    use_scm_version=True,
+    setup_requires=['setuptools_scm'],
+    install_requires=['scikit-learn', 'scipy', 'numpy', 'matplotlib',
+                      'astropy', 'mpdaf', 'photutils', 'tqdm'],
     packages=find_packages(),
     zip_safe=False,
     package_data={

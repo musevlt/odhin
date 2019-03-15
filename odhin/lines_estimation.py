@@ -1,20 +1,13 @@
 import numpy as np
-import scipy.stats as sst 
+import scipy.stats as sst
 import scipy.signal as ssl
-from scipy.ndimage.morphology import binary_dilation, grey_dilation
+from astropy.stats import mad_std
+from scipy.ndimage.morphology import grey_dilation
 
-def getLinesSupportList(
-        listSpe,
-        w=2,
-        wmin=1,
-        wmax=20,
-        alpha=1.4,
-        beta=1.2,
-        n_sig=1.2,
-        f=0.6,
-        returnAll=False,
-        filt=None,
-        localConstraint=True):
+
+def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
+                        n_sig=1.2, f=0.6, returnAll=False, filt=None,
+                        localConstraint=True):
     """
     Get emission/absorption lines spectral support
 
@@ -35,18 +28,16 @@ def getLinesSupportList(
         Stop line spectral support where signal is lower than beta*sig.
     n_sig: float
         A half-width corresponds to n_sig standard deviations of the kernel.
-
     f: float
-        to avoid too many overlapping masks : if already covered at more than a fraction f by an existing
-        mask don't add current mask
+        to avoid too many overlapping masks : if already covered at more than
+        a fraction f by an existing mask don't add current mask
     returnAll : bool
         return all intermediate results
     filt: 1d-array (None by default)
         pattern for matching filter (gaussian shape will be made by default)
     localConstraint : bool
-        if True, reject peaks where immediate neighbors of extrema are not > 1 std
-        (maxima) or < -1 std (minima).
-
+        if True, reject peaks where immediate neighbors of extrema are not
+        > 1 std (maxima) or < -1 std (minima).
 
     Output:
     ------
@@ -61,12 +52,12 @@ def getLinesSupportList(
     listMask = []
     for l in range(len(listSpe)):
         spe = listSpe[l]
-        sig = 1.489 * mad(spe)  # compute standard deviation estimator from MAD
+        sig = mad_std(spe)  # compute standard deviation estimator from MAD
 
         spe_filt = ssl.fftconvolve(
             spe, filt, mode='same')  # matched filter using filt
         # compute standard deviation estimator of filtered data from MAD
-        sig_filt = 1.489 * mad(spe_filt)
+        sig_filt = mad_std(spe_filt)
         lRejected = 0
 
         # find local extrema
@@ -133,8 +124,8 @@ def getLinesSupportList(
                 mask[a:b] = True
                 listMask.append(mask)
     if returnAll:
-        return listMask, lRejected, len(
-            listExtrema), nThresh, listExtrema, listArgExtrema, spe_filt, sig_filt, sig
+        return (listMask, lRejected, len(listExtrema), nThresh, listExtrema,
+                listArgExtrema, spe_filt, sig_filt, sig)
     return listMask
 
 
@@ -150,7 +141,6 @@ def genKernels(listWidth=np.arange(5, 42, 2), n=41, n_sig=2):
         length of a kernel 1d-array
     n_sig: float
          A half-width corresponds to n_sig standard deviations.
-
 
     Output
     ----------
@@ -197,15 +187,4 @@ def calcWidth(spe, listKernel=None, n_sig=1, listWidth=np.arange(5, 42, 2)):
     listCorr = []
     for g in listKernel:
         listCorr.append(np.dot(spe, g))
-    res = listWidth[np.argmax(np.abs(listCorr))]
-    return res
-
-
-def mad(arr):
-    """ Median Absolute Deviation: a "Robust" version of standard deviation.
-        Indices variabililty of the sample.
-        https://en.wikipedia.org/wiki/Median_absolute_deviation
-    """
-    # arr = np.ma.array(arr).compressed()  # should be faster to not use masked arrays.
-    med = np.median(arr)
-    return np.median(np.abs(arr - med))
+    return listWidth[np.argmax(np.abs(listCorr))]

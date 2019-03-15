@@ -1,158 +1,154 @@
 """
 @author: raphael.bacher@gipsa-lab.fr
 
-Store methods for 
+Store methods for
 - grouping sources to be deblended
 - exploring groups
 - modifying groups
 """
-from skimage.measure import regionprops, label
-from photutils import SegmentationImage
-import matplotlib.patches as mpatches
-from .deblend_utils import _getLabel,createIntensityMap,modifSegmap
+
+import logging
 import numpy as np
-import multiprocessing
-import tqdm
+from skimage.measure import regionprops, label
+from tqdm import tqdm
+
+from .deblend_utils import createIntensityMap
 
 
-class SourceGroup():
+class SourceGroup:
 
-    def __init__(self, GID, listSources, region):
+    __slots__ = ('GID', 'listSources', 'region', 'nbSources', 'idxSources')
+
+    def __init__(self, GID, listSources, idxSources, region):
         self.GID = GID
         self.listSources = listSources
-        self.region = region #RegionAttr region
+        self.idxSources = idxSources
+        self.region = region  # RegionAttr region
         self.nbSources = len(listSources)
-        self.condNumber = 0
-        self.Xi2 = 0
 
-class RegionAttr():
+
+class RegionAttr:
     """
     Get region attributes from skimage region properties
     """
-    def __init__(self, area, centroid, bbox):
+
+    __slots__ = ('area', 'centroid', 'sx', 'sy')
+
+    def __init__(self, area, centroid, sy, sx):
         self.area = area
         self.centroid = centroid
-        self.bbox = bbox
-        
-def getRegionAttr(sk_region):
+        self.sy = sy
+        self.sx = sx
+
+    @classmethod
+    def from_skimage(cls, reg):
+        min_row, min_col, max_row, max_col = reg.bbox
+        sy = slice(min_row, max_row)
+        sx = slice(min_col, max_col)
+        return cls(reg.area, reg.centroid, sy, sx)
+
+    @property
+    def bbox_area(self):
+        return (self.sy.stop - self.sy.start) * (self.sx.stop - self.sx.start)
+
+    def ensureMinimalBbox(self, min_width, imLabel, min_sky_pixels, margin):
+        """
+        Ensures that region respects a minimal area and contains at least
+        `min_sky_pixels` sky pixels.
+        """
+        # First add margin around bounding box
+        ny, nx = imLabel.shape
+        self.sy = slice(int(max(self.sy.start - margin, 0)),
+                        int(min(self.sy.stop + margin, ny)))
+        self.sx = slice(int(max(self.sx.start - margin, 0)),
+                        int(min(self.sx.stop + margin, nx)))
+
+        # then check minimal area
+        if self.bbox_area < min_width**2:
+            half_width = min_width // 2
+            self.sy = slice(int(max(self.centroid[0] - half_width, 0)),
+                            int(min(self.centroid[0] + half_width, ny)))
+            self.sx = slice(int(max(self.centroid[1] - half_width, 0)),
+                            int(min(self.centroid[1] + half_width, nx)))
+
+        # then check minimal number of sky pixels
+        nb_pixels = np.sum(imLabel[self.sy, self.sx] == 0)
+        while nb_pixels < min_sky_pixels:
+            min_width = min_width + 1
+            half_width = min_width // 2
+            self.sy = slice(int(max(self.centroid[0] - half_width, 0)),
+                            int(min(self.centroid[0] + half_width, ny)))
+            self.sx = slice(int(max(self.centroid[1] - half_width, 0)),
+                            int(min(self.centroid[1] + half_width, nx)))
+            nb_pixels = np.sum(imLabel[self.sy, self.sx] == 0)
+
+    def convertToHR(self, imHR, imLR):
+        """Convert the bounding box from low resolution (MUSE) to
+        high resolution (HST).
+        """
+        pos = np.array([[self.sy.start, self.sx.start],
+                        [self.sy.stop, self.sx.stop]])
+        return imHR.wcs.sky2pix(imLR.wcs.pix2sky(pos), nearest=True).flatten()
+
+
+def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
+               verbose=True):
     """
-    build regionAttr from skimage region
-    
-    Intut:
-    ------
-    sk_region : skimage region
-    
-    Output:
-    ------
-    region : RegionAttr
+    Segment all sources in a number of connected (at the MUSE resolution)
+    groups
     """
-    region = RegionAttr(sk_region.area, sk_region.centroid, sk_region.bbox)
-    return region
-    
-def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,verbose=True):
-    """
-    Segment all sources in a number of connected (at the MUSE resolution) groups
-    """
+    logger = logging.getLogger(__name__)
+    intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE,
+                                              kernel_transfert, params)
+
     cut = params.cut
-    segmap = modifSegmap(segmap, cat) # needed because of potential discrepancy between the catalog and the segmentation map (as in Rafelski15)
-    intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE, kernel_transfert, params)
     imLabel = label(intensityMapLRConvol > cut)
-    listGroups=[]
-
+    groups = []
+    regions = regionprops(imLabel)
     if verbose:
-        ntasks = len(regionprops(imLabel))
-        pbar = tqdm.tqdm(total=ntasks)
-        
-    keys_cat = cat['ID']
-    listRegions = regionprops(imLabel)
-    
-    for i,sk_region in enumerate(listRegions):
-        region = getRegionAttr(sk_region) 
-        blob_mask = (imLabel==i+1)
-        ensureMinimalBbox(region,params.min_width,imLabel,params.min_sky_pixels,params.margin_bbox)
-        bbox = region.bbox # order is row0,column0,row1,column1
-        
-        bboxHR = convertBboxToHR(bbox,segmap,imMUSE)
-        subsegmap = segmap.data[ bboxHR[0]:bboxHR[2],bboxHR[1]:bboxHR[3]]
-        sub_blob_mask = blob_mask[bbox[0]:bbox[2],bbox[1]:bbox[3] ]
-        subimMUSE = imMUSE[bbox[0]:bbox[2],bbox[1]:bbox[3]]
-        listSources = getObjsInBlob(keys_cat,cat,sub_blob_mask, subimMUSE,subsegmap)[1]
-        listGroups.append(SourceGroup(GID=i,listSources=listSources,region=region))
-        if verbose:
-            pbar.update(1)
-        
-    return listGroups,imLabel
+        regions = tqdm(regions)
 
-def ensureMinimalBbox(region,width,imLabel,min_sky_pixels,margin_bbox):
-    """
-    Ensures that region respects a minimal area and contains at least `min_sky_pixels` sky pixels 
-    """
-    # First add margin around bounding box
-    bbox=[0,0,0,0] #init
-    bbox[0] = int(np.maximum(region.bbox[0]-margin_bbox,0))
-    bbox[1] = int(np.maximum(region.bbox[1]-margin_bbox,0))
-    bbox[2] = int(np.minimum(region.bbox[2]+margin_bbox,imLabel.shape[0]))
-    bbox[3] = int(np.minimum(region.bbox[3]+margin_bbox,imLabel.shape[1]))
-    region.bbox=(bbox[0],bbox[1],bbox[2],bbox[3])
-    region.area = (region.bbox[2]-region.bbox[0])*region.bbox[3]-region.bbox[1]
-    
-    if region.area < width**2: #then check minimal area
-        bbox=[0,0,0,0]
-        bbox[0] = int(np.maximum(region.centroid[0]-width//2,0))
-        bbox[1] = int(np.maximum(region.centroid[1]-width//2,0))
-        bbox[2] = int(np.minimum(region.centroid[0]+width//2,imLabel.shape[0]))
-        bbox[3] = int(np.minimum(region.centroid[1]+width//2,imLabel.shape[1]))
-        region.bbox=(bbox[0],bbox[1],bbox[2],bbox[3])
-        region.area = (region.bbox[2]-region.bbox[0])*region.bbox[3]-region.bbox[1]
-        
-    nb_pixels = np.sum(imLabel[region.bbox[0]:region.bbox[2],region.bbox[1]:region.bbox[3]] == 0)
-    while nb_pixels < min_sky_pixels: # then check minimal number of sky pixels
-        width = width+1
-        bbox=[0,0,0,0]
-        bbox[0] = int(np.maximum(region.centroid[0]-width//2,0))
-        bbox[1] = int(np.maximum(region.centroid[1]-width//2,0))
-        bbox[2] = int(np.minimum(region.centroid[0]+width//2,imLabel.shape[0]))
-        bbox[3] = int(np.minimum(region.centroid[1]+width//2,imLabel.shape[1]))
-        nb_pixels = np.sum(imLabel[bbox[0]:bbox[2],bbox[1]:bbox[3]] == 0)
-        region.bbox=(bbox[0],bbox[1],bbox[2],bbox[3])
-        region.area = (region.bbox[2]-region.bbox[0])*region.bbox[3]-region.bbox[1]
-            
-    
+    for skreg in regions:
+        # Build a RegionAttr object from a skimage region
+        region = RegionAttr.from_skimage(skreg)
+        region.ensureMinimalBbox(params.min_width, imLabel,
+                                 params.min_sky_pixels, params.margin_bbox)
+        bboxHR = region.convertToHR(segmap, imMUSE)
+        subsegmap = segmap.data[bboxHR[0]:bboxHR[2], bboxHR[1]:bboxHR[3]]
+        blob_mask = (imLabel == skreg.label)
+        sub_blob_mask = blob_mask[region.sy, region.sx]
+        subimMUSE = imMUSE[region.sy, region.sx]
+        idx, sources = getObjsInBlob('ID', cat, sub_blob_mask, subimMUSE,
+                                     subsegmap)
+        if len(sources) == 1:
+            # FIXME: this should not happen. It seems to happen when a source
+            # is close to an edge, and because the HR to LR resampling remove
+            # the source flux on the edge spaxels. Should investigate more!
+            logger.warning('found no sources in group %d', skreg.label - 1)
+        else:
+            groups.append(SourceGroup(skreg.label - 1, sources, idx, region))
 
-def getObjsInBlob(keys_cat, cat, sub_blob_mask, subimMUSE, subsegmap):
-    """
-    
+    return groups, imLabel
+
+
+def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, subsegmap):
+    """Return the index and IDs of sources in the blobs.
+
     output
     ------
-    listObjInBlob : list of simple indices (from 0 to nb of sources in bounding box) of objects in the bounding box connected to the blob
-    listObjInBlob : list of catalog indices  of objects in the bounding box connected to the blob
+    listObjInBlob : list of simple indices (from 0 to nb of sources in
+    bounding box) of objects in the bounding box connected to the blob
+    listObjInBlob : list of catalog indices  of objects in the bounding
+    box connected to the blob
     """
-    listObjInBlob = [0]
-    listHSTObjInBlob = ['bg']
-    labelHR = _getLabel(subsegmap)
-    nbSources = np.max(labelHR)+1
-    listHST_ID = ['bg'] + [int(subsegmap[labelHR == k][0])
-                       for k in range(1, nbSources)]
-    for k in range(1, len(listHST_ID)):
-        if listHST_ID[k] in keys_cat:
-            row = cat.loc['ID', listHST_ID[k]]
-            center = (row['DEC'], row['RA'])
-            centerMUSE = subimMUSE.wcs.sky2pix([center], nearest=True)[0]
-            if sub_blob_mask[centerMUSE[0], centerMUSE[1]]: #y,x
-                listObjInBlob.append(k)
-                listHSTObjInBlob.append(listHST_ID[k])
-    return listObjInBlob,listHSTObjInBlob
-    
+    listHST_ID = np.unique(subsegmap)
+    listHST_ID = listHST_ID[listHST_ID > 0]
 
-def convertBboxToHR(bbox,imHR,imLR):
-    """
-    convert the bounding box from low resolution (MUSE) to high resolution (HST)
-    """
-    y0,x0 = bbox[0],bbox[1] #row then column
-    y1,x1 = bbox[2],bbox[3]
-        
-    bboxHR = imHR.wcs.sky2pix(imLR.wcs.pix2sky(np.array([[y0,x0],[y1,x1]])),nearest=True).flatten() #still y,x (row,column)
-    
-    return bboxHR
+    subcat = cat.loc[idname, listHST_ID]
+    center = np.array([subcat['DEC'], subcat['RA']]).T
+    centerMUSE = subimMUSE.wcs.sky2pix(center, nearest=True).T
+    idx = sub_blob_mask[centerMUSE[0], centerMUSE[1]]
 
-
+    listObjInBlob = [0] + list(np.where(idx)[0] + 1)
+    listHSTObjInBlob = ['bg'] + list(listHST_ID[idx])
+    return listObjInBlob, listHSTObjInBlob
