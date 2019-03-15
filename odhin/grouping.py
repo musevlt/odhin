@@ -125,8 +125,8 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
             # is close to an edge, and because the HR to LR resampling remove
             # the source flux on the edge spaxels. Should investigate more!
             logger.warning('found no sources in group %d', skreg.label - 1)
-        else:
-            groups.append(SourceGroup(skreg.label - 1, sources, idx, region))
+
+        groups.append(SourceGroup(skreg.label - 1, sources, idx, region))
 
     return groups, imLabel
 

@@ -104,7 +104,7 @@ class ODHIN():
             self.main_kernel_transfert, params=self.params, verbose=verbose)
 
         names = ('G_ID', 'nbSources', 'listIDs', 'Area')
-        groups = [[i, group.nbSources, tuple(group.listSources),
+        groups = [[group.GID, group.nbSources, tuple(group.listSources),
                    group.region.area]
                   for i, group in enumerate(self.groups)]
         self.table_groups = Table(names=names, rows=groups,
@@ -128,6 +128,11 @@ class ODHIN():
         to_process = []
         for i in listGroupToDeblend:
             group = self.groups[i]
+            if len(group.listSources) == 1:
+                self.logger.warning('skipping group %d, no sources in group',
+                                    group.GID)
+                continue
+
             # args: subcube, subhstimages, subsegmap
             args = prepare_inputs(self.cube, self.hstimages, self.segmap,
                                   group.region)
@@ -213,7 +218,7 @@ class ODHIN():
         reg = group.region
         subim = self.imMUSE[reg.sy, reg.sx]
         subim.plot(ax=ax)
-        ax.contour(self.imLabel[reg.sy, reg.sx] == group_id + 1,
+        ax.contour(self.imLabel[reg.sy, reg.sx] == group.GID + 1,
                    levels=1, colors='r')
 
         src = group.listSources.copy()
