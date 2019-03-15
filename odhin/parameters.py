@@ -6,6 +6,7 @@
 
 import os
 import numpy as np
+import yaml
 
 # get default files for hst response filters
 
@@ -25,6 +26,15 @@ DEFAULT_HSTFILTER850 = os.path.join(
     os.path.dirname(
         os.path.abspath(__file__)),
     '../data/HST_ACS_WFC.F850LP_81.dat')
+
+
+def load_settings(settings_file):
+    """Load the YAML settings, and substitute keys from the 'vars' block."""
+    with open(settings_file, 'r') as f:
+        conftext = f.read()
+    conf = yaml.safe_load(conftext)
+    conftext = conftext.format(**conf.get('vars', {}))
+    return yaml.safe_load(conftext)
 
 
 class Params():

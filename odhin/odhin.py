@@ -7,7 +7,6 @@ import multiprocessing
 import numpy as np
 import pathlib
 import tqdm
-import yaml
 
 from astropy.io import fits
 from astropy.table import Table, vstack
@@ -19,7 +18,7 @@ from .deblend import deblendGroup
 from .deblend_utils import (calcMainKernelTransfert, get_fig_ax, cmap,
                             extractHST, check_segmap_catalog)
 from .grouping import doGrouping
-from .parameters import Params
+from .parameters import Params, load_settings
 
 
 def prepare_inputs(cube, hstimages, segmap, region):
@@ -58,13 +57,11 @@ class ODHIN:
     def __init__(self, settings_file, output_dir):
         self.logger = logging.getLogger(__name__)
         self.logger.debug('loading settings from %s', settings_file)
-        self.settings_file = settings_file
         self.output_dir = pathlib.Path(output_dir)
         self.groups = None
 
-        with open(settings_file, 'r') as f:
-            self.conf = yaml.load(f.read())
-
+        self.settings_file = settings_file
+        self.conf = load_settings(settings_file)
         self.cube = Cube(self.conf['cube'])
 
         # if nothing provided take white image of the cube
