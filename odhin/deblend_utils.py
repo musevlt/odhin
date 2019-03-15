@@ -342,9 +342,7 @@ def getBlurKernel(imHR, imLR, sizeKer, returnImBlurred=False, cut=0.00001):
 
 
 def calcMainKernelTransfert(params, imHST):
-    """
-    Build transfert kernel between an HR kernel and LR kernel (defined in paramaters)
-    """
+    """Build the transfert kernel between an HR kernel and LR kernel."""
     # get parameters
     fsf_beta_muse = params.fsf_beta_muse
     fwhm_muse = params.fwhm_muse
