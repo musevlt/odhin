@@ -5,8 +5,8 @@
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
 SPHINXPROJ    = ODHIN
-SOURCEDIR     = source
-BUILDDIR      = build
+SOURCEDIR     = .
+BUILDDIR      = _build
 
 # Put it first so that "make" without argument is like "make help".
 help:
@@ -18,3 +18,12 @@ help:
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+
+livehtml:
+	sphinx-autobuild -b html $(ALLSPHINXOPTS) "$(SOURCEDIR)" $(BUILDDIR)/html
+
+sync:
+	rsync -rltDvhc --exclude=.doctrees _build/html/ urania1:/srv/UDF/musered
+
+clean:
+	rm -rf _build/ api/

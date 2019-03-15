@@ -10,4 +10,6 @@
 tags
 build/
 dist/
+docs/_build/
+docs/api/
 .ipynb_checkpoints/

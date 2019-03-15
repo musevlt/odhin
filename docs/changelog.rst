@@ -4,7 +4,4 @@
 Full Changelog
 **************
 
-.. include:: ../../CHANGELOG
-
-
-
+.. include:: ../CHANGELOG

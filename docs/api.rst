@@ -1,6 +1,5 @@
 Reference/API
 =============
 
-.. automodapi:: deblend
+.. automodapi:: odhin
    :no-main-docstr:
-
