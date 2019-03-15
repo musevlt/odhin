@@ -6,4 +6,5 @@ Created on Thu Jun 30 07:59:14 2016
 """
 
 from .odhin import ODHIN
+from .parameters import DEFAULT_PARAMS, Params
 from .version import __version__

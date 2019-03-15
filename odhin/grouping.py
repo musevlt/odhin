@@ -26,6 +26,9 @@ class SourceGroup:
         self.region = region  # RegionAttr region
         self.nbSources = len(listSources)
 
+    def __repr__(self):
+        return f'<SourceGroup({self.GID}, {self.nbSources} sources)>'
+
 
 class RegionAttr:
     """

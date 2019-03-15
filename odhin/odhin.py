@@ -80,7 +80,7 @@ class ODHIN:
         self.cat.add_index('ID')
         self.cat = check_segmap_catalog(self.segmap, self.cat)
 
-        self.params = Params()
+        self.params = Params(**self.conf.get('params', {}))
 
         # if nothing provided take the first of the HST images
         if 'hr_ref_image' in self.conf:
@@ -138,6 +138,7 @@ class ODHIN:
                                     group.GID)
                 continue
 
+            self.logger.debug('deblending group %d', group.GID)
             # args: subcube, subhstimages, subsegmap
             args = prepare_inputs(self.cube, self.hstimages, self.segmap,
                                   group.region)
@@ -155,6 +156,7 @@ class ODHIN:
             cpu_count = cpu
 
         cpu_count = min(cpu_count, len(listGroupToDeblend))
+        self.logger.debug('using %d cpus', cpu_count)
         if cpu_count > 1:
             pool = multiprocessing.Pool(processes=cpu_count)
             if verbose:
