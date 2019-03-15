@@ -90,6 +90,12 @@ class ODHIN:
 
         self.imHST = extractHST(self.imHST, self.imMUSE)
 
+    @staticmethod
+    def set_loglevel(level):
+        logger = logging.getLogger()
+        logger.setLevel(level)
+        logger.handlers[0].setLevel(level)
+
     def grouping(self, verbose=True, cut=None):
         """
         Segment all sources in a number of connected (at the MUSE resolution)
