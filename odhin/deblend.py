@@ -22,18 +22,15 @@ from .version import __version__
 
 def deblendGroup(subcube, subhstimages, subsegmap, group, outfile):
     logger = logging.getLogger(__name__)
-    try:
-        logger.debug('group %d, start', group.GID)
-        debl = Deblending(subcube, subhstimages)
-        logger.debug('group %d, createIntensityMap', group.GID)
-        debl.createIntensityMap(subsegmap.data.filled(0.))
-        logger.debug('group %d, findSources', group.GID)
-        debl.findSources()
-        logger.debug('group %d, write', group.GID)
-        debl.write(outfile, group)
-        logger.debug('group %d, done', group.GID)
-    except Exception:
-        logger.error('group %d, failed', group.GID, exc_info=True)
+    logger.debug('group %d, start', group.GID)
+    debl = Deblending(subcube, subhstimages)
+    logger.debug('group %d, createIntensityMap', group.GID)
+    debl.createIntensityMap(subsegmap.data.filled(0.))
+    logger.debug('group %d, findSources', group.GID)
+    debl.findSources()
+    logger.debug('group %d, write', group.GID)
+    debl.write(outfile, group)
+    logger.debug('group %d, done', group.GID)
 
 
 class Deblending:

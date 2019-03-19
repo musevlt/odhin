@@ -37,6 +37,14 @@ def prepare_inputs(cube, hstimages, segmap, region):
     return subcube, subhstimages, subsegmap
 
 
+def _worker_deblend(subcube, subhstimages, subsegmap, group, outfile):
+    try:
+        deblendGroup(subcube, subhstimages, subsegmap, group, outfile)
+    except Exception:
+        logger = logging.getLogger(__name__)
+        logger.error('group %d, failed', group.GID, exc_info=True)
+
+
 class ODHIN:
     """
     Main class for the deblending process.
@@ -177,7 +185,7 @@ class ODHIN:
                     pass
 
             for args in to_process:
-                pool.apply_async(deblendGroup, args=args, callback=update)
+                pool.apply_async(_worker_deblend, args=args, callback=update)
 
             pool.close()
             pool.join()
