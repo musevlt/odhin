@@ -104,7 +104,6 @@ class Deblending:
             im.primary_header['FILTER'] = filters[k]
 
         # spatial shapes
-        self.shapeHR = self.listImagesHR[0].shape
         self.shapeLR = self.cube.shape[1:]
 
         self.residuals = np.zeros((self.cube.shape[0], np.prod(self.shapeLR)))
@@ -189,7 +188,7 @@ class Deblending:
         nbImagesHR = len(self.listImagesHR)
 
         def _create_result_list():
-            return [[None] * self.nBands] * nbImagesHR
+            return [[None] * self.nBands for _ in range(nbImagesHR)]
 
         tmp_sources = []
         tmp_var = []
@@ -319,7 +318,7 @@ class Deblending:
         dy, dx = hst.get_step(unit=units.arcsec)
 
         # get odd shape
-        shape_1 = np.array(self.shapeHR) // 2 * 2 + 1
+        shape_1 = np.array(hst.shape) // 2 * 2 + 1
         center = shape_1 // 2
 
         # Build "distances to center" matrix.
@@ -353,28 +352,27 @@ class Deblending:
                                  axis=0) / weigthTot
 
         # for background, get voxel mean instead of sum
-        self.sources[0] = self.sources[0] / self.cubeLR.size
-        self.varSources[0] = self.varSources[0] / self.cubeLR.size
+        self.sources[0] /= self.cubeLR.size
+        self.varSources[0] /= self.cubeLR.size
 
     def _rebuildCube(self, tmp_sources):
         """
         Create estimated cube. We have to work on each MUSE spectral bin as
         the spatial distribution is different on each bin
         """
-        estimatedCube = np.zeros((self.cubeLR.shape[0],
-                                  self.cubeLR.shape[1] * self.cubeLR.shape[2]))
+        estimatedCube = np.zeros((self.cubeLR.shape[0], np.prod(self.shapeLR)))
         delta = int(self.cubeLR.shape[0] / float(self.nBands))
+        filtResp = np.array(self.filtResp)
+        filtResp /= filtResp.sum(axis=0)
 
         for i in range(self.nBands):
             imin, imax = i * delta, (i + 1) * delta
-            weightTot = np.sum([resp[imin:imax] for resp in self.filtResp],
-                               axis=0)
 
             estim = []
-            for j, resp in enumerate(self.filtResp):
-                tmp = np.dot(tmp_sources[j][:, imin:imax].T,
+            for j, resp in enumerate(filtResp):
+                arr = np.dot(tmp_sources[j][:, imin:imax].T,
                              self.listIntensityMapLRConvol[j][i])
-                arr = (resp[imin:imax] / weightTot)[:, np.newaxis] * tmp
+                arr *= resp[imin:imax][:, np.newaxis]
                 estim.append(arr)
 
             estimatedCube[imin:imax, :] = np.sum(estim, axis=0)

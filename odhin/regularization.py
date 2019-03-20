@@ -130,8 +130,8 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
     # center data
     X_offset = np.mean(X, axis=0)
     Y_offset = np.mean(Y, axis=0)
-    X -= X_offset
-    Y -= Y_offset
+    X = X - X_offset
+    Y = Y - Y_offset
 
     # compute the coeffs (estimated spectra) for each possible model.
     coef_path_ = []
