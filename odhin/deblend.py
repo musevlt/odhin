@@ -4,6 +4,7 @@
 """
 
 import astropy.units as units
+import logging
 import numpy as np
 import scipy.signal as ssl
 
@@ -20,10 +21,16 @@ from .version import __version__
 
 
 def deblendGroup(subcube, subhstimages, subsegmap, group, outfile):
+    logger = logging.getLogger(__name__)
+    logger.debug('group %d, start', group.GID)
     debl = Deblending(subcube, subhstimages)
+    logger.debug('group %d, createIntensityMap', group.GID)
     debl.createIntensityMap(subsegmap.data.filled(0.))
+    logger.debug('group %d, findSources', group.GID)
     debl.findSources()
+    logger.debug('group %d, write', group.GID)
     debl.write(outfile, group)
+    logger.debug('group %d, done', group.GID)
 
 
 class Deblending:

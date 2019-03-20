@@ -2,18 +2,23 @@
 @author: raphael.bacher@gipsa-lab.fr
 """
 
+import logging
 import multiprocessing
 import numpy as np
 import pathlib
 import tqdm
+
+from astropy.io import fits
 from astropy.table import Table, vstack
 from mpdaf import CPU
+from mpdaf.obj import Cube, Image
+from mpdaf.sdetect import Catalog
 
 from .deblend import deblendGroup
 from .deblend_utils import (calcMainKernelTransfert, get_fig_ax, cmap,
                             extractHST, check_segmap_catalog)
 from .grouping import doGrouping
-from .parameters import Params
+from .parameters import Params, load_settings
 
 
 def prepare_inputs(cube, hstimages, segmap, region):
@@ -32,64 +37,72 @@ def prepare_inputs(cube, hstimages, segmap, region):
     return subcube, subhstimages, subsegmap
 
 
-class ODHIN():
+def _worker_deblend(subcube, subhstimages, subsegmap, group, outfile):
+    try:
+        deblendGroup(subcube, subhstimages, subsegmap, group, outfile)
+    except Exception:
+        logger = logging.getLogger(__name__)
+        logger.error('group %d, failed', group.GID, exc_info=True)
 
-    def __init__(self, cube, hstimages, segmap, cat, output_dir, params=None,
-                 imMUSE=None, imHST=None, main_kernel_transfert=None):
-        """
-        Main class for deblending process
 
-        Parameters
-        ----------
-        cube : mpdaf.obj.Cube
-            The mpdaf Cube object to be deblended
-        hstimages: list of mpdaf.obj.Image
-            HST mpdaf images
-        segmap : mpdaf.obj.Image
-            segmentation map at HST resolution
-        cat: mpdaf.sdetect.Catalog
-            catalog of sources
-        output_dir: str
-            if not None, results of each group is saved in this directory
-        params : class with all parameters
-            defined in module parameters
-        imMUSE (opt):
-            white image MUSE (if none created by summation on the cube)
-        imHST (opt):
-            reference HST image (if none the first of hstimages is taken)
-        main_kernel_transfert (opt):
-            kernel HST->MUSE to be used for preprocessing (grouping).
-            If none provided build transfer kernel from default parameters
+class ODHIN:
+    """
+    Main class for the deblending process.
 
-        Attributes
-        ----------
-        table_groups
-        table_sources
-        """
+    Parameters
+    ----------
+    settings_file : str
+        Settings file.
+    output_dir: str
+        if not None, results of each group is saved in this directory
 
-        self.cube = cube
-        self.hstimages = hstimages
-        self.segmap = segmap
-        self.cat = cat
-        self.params = params
+    Attributes
+    ----------
+    table_groups
+    table_sources
+    """
+
+    def __init__(self, settings_file, output_dir):
+        self.logger = logging.getLogger(__name__)
+        self.logger.debug('loading settings from %s', settings_file)
         self.output_dir = pathlib.Path(output_dir)
-        if params is None:
-            self.params = Params()
         self.groups = None
 
+        self.settings_file = settings_file
+        self.conf = load_settings(settings_file)
+        self.cube = Cube(self.conf['cube'])
+
         # if nothing provided take white image of the cube
-        self.imMUSE = imMUSE or self.cube.sum(axis=0)
+        if 'white' in self.conf:
+            self.imMUSE = Image(self.conf['white'])
+        else:
+            self.imMUSE = self.cube.sum(axis=0)
+
+        self.hstimages = [extractHST(Image(f), self.imMUSE)
+                          for f in self.conf['hr_images']]
+        self.segmap = extractHST(Image(self.conf['segmap']), self.imMUSE)
+
+        # catalog: check for potential discrepancy between the catalog and the
+        # segmentation map (as in Rafelski15)
+        self.cat = Catalog.read(self.conf['catalog'])
+        self.cat.add_index('ID')
+        self.cat = check_segmap_catalog(self.segmap, self.cat)
+
+        self.params = Params(**self.conf.get('params', {}))
 
         # if nothing provided take the first of the HST images
-        self.imHST = imHST or self.hstimages[0]
+        if 'hr_ref_image' in self.conf:
+            self.imHST = Image(self.conf['hr_ref_image'])
+        else:
+            self.imHST = self.hstimages[0]
 
-        # if nothing provided build transfer kernel from default parameters
-        self.main_kernel_transfert = main_kernel_transfert or \
-            calcMainKernelTransfert(self.params, self.imHST)
+        self.imHST = extractHST(self.imHST, self.imMUSE)
 
-        # needed because of potential discrepancy between the catalog and the
-        # segmentation map (as in Rafelski15)
-        self.cat = check_segmap_catalog(self.segmap, self.cat)
+    @staticmethod
+    def set_loglevel(level):
+        logger = logging.getLogger()
+        logger.setLevel(level)
+        logger.handlers[0].setLevel(level)
 
     def grouping(self, verbose=True, cut=None):
         """
@@ -99,9 +112,15 @@ class ODHIN():
         if cut is not None:
             self.params.cut = cut
 
+        # if nothing provided build transfer kernel from default parameters
+        if 'kernel_transfert' in self.conf:
+            kernel_transfert = fits.getdata(self.conf['kernel_transfert'])
+        else:
+            kernel_transfert = calcMainKernelTransfert(self.params, self.imHST)
+
         self.groups, self.imLabel = doGrouping(
             self.cube, self.imHST, self.segmap, self.imMUSE, self.cat,
-            self.main_kernel_transfert, params=self.params, verbose=verbose)
+            kernel_transfert, params=self.params, verbose=verbose)
 
         names = ('G_ID', 'nbSources', 'listIDs', 'Area')
         groups = [[group.GID, group.nbSources, tuple(group.listSources),
@@ -133,6 +152,7 @@ class ODHIN():
                                     group.GID)
                 continue
 
+            self.logger.debug('deblending group %d', group.GID)
             # args: subcube, subhstimages, subsegmap
             args = prepare_inputs(self.cube, self.hstimages, self.segmap,
                                   group.region)
@@ -150,6 +170,7 @@ class ODHIN():
             cpu_count = cpu
 
         cpu_count = min(cpu_count, len(listGroupToDeblend))
+        self.logger.debug('using %d cpus', cpu_count)
         if cpu_count > 1:
             pool = multiprocessing.Pool(processes=cpu_count)
             if verbose:
@@ -164,7 +185,7 @@ class ODHIN():
                     pass
 
             for args in to_process:
-                pool.apply_async(deblendGroup, args=args, callback=update)
+                pool.apply_async(_worker_deblend, args=args, callback=update)
 
             pool.close()
             pool.join()
