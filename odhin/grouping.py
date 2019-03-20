@@ -96,11 +96,10 @@ class RegionAttr:
         return imHR.wcs.sky2pix(imLR.wcs.pix2sky(pos), nearest=True).flatten()
 
 
-def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
+def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
                verbose=True):
-    """
-    Segment all sources in a number of connected (at the MUSE resolution)
-    groups
+    """Segment all sources in a number of connected (at the MUSE resolution)
+    groups.
     """
     logger = logging.getLogger(__name__)
     intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE,

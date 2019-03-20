@@ -4,17 +4,8 @@
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-import os
 import numpy as np
 import yaml
-
-# get default files for hst response filters
-CURDIR = os.path.dirname(os.path.abspath(__file__))
-DATADIR = os.path.abspath(os.path.join(CURDIR, '..', 'data'))
-DEFAULT_HSTFILTER606 = os.path.join(DATADIR, 'HST_ACS_WFC.F606W_81.dat')
-DEFAULT_HSTFILTER775 = os.path.join(DATADIR, 'HST_ACS_WFC.F775W_81.dat')
-DEFAULT_HSTFILTER814 = os.path.join(DATADIR, 'HST_ACS_WFC.F814W_81.dat')
-DEFAULT_HSTFILTER850 = os.path.join(DATADIR, 'HST_ACS_WFC.F850LP_81.dat')
 
 DEFAULT_PARAMS = {
     # Beta parameter for HST PSF Moffat model
@@ -47,9 +38,6 @@ DEFAULT_PARAMS = {
     # minimal number of sky pixels in a bounding box to estimate correctly
     # the background
     'min_sky_pixels': 20,
-    # hst spectral filter response
-    'listFiltName': [DEFAULT_HSTFILTER606,  DEFAULT_HSTFILTER775,
-                     DEFAULT_HSTFILTER814, DEFAULT_HSTFILTER850],
 }
 
 

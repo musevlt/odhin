@@ -20,25 +20,9 @@ from .grouping import doGrouping
 from .parameters import Params, load_settings
 
 
-def prepare_inputs(cube, hstimages, segmap, region):
-    """Extract data for each group before the multiprocessing (avoid large
-    datasets copies).
-    """
-    subcube = cube[:, region.sy, region.sx]
-    subsegmap = extractHST(segmap, subcube[0])
-    subhstimages = [extractHST(hst, subcube[0]) for hst in hstimages]
-
-    for obj in [subcube, subsegmap] + subhstimages:
-        # need to copy some header infos, because wcs info are not
-        # completly copied during an image resize
-        obj.data_header.update(obj.wcs.to_header())
-
-    return subcube, subhstimages, subsegmap
-
-
-def _worker_deblend(subcube, subhstimages, subsegmap, group, outfile):
+def _worker_deblend(group, outfile, conf):
     try:
-        deblendGroup(subcube, subhstimages, subsegmap, group, outfile)
+        deblendGroup(group, outfile, conf)
     except Exception:
         logger = logging.getLogger(__name__)
         logger.error('group %d, failed', group.GID, exc_info=True)
@@ -69,16 +53,14 @@ class ODHIN:
 
         self.settings_file = settings_file
         self.conf = load_settings(settings_file)
-        self.cube = Cube(self.conf['cube'])
 
         # if nothing provided take white image of the cube
         if 'white' in self.conf:
             self.imMUSE = Image(self.conf['white'])
         else:
-            self.imMUSE = self.cube.sum(axis=0)
+            cube = Cube(self.conf['cube'])
+            self.imMUSE = cube.sum(axis=0)
 
-        self.hstimages = [extractHST(Image(f), self.imMUSE)
-                          for f in self.conf['hr_images']]
         self.segmap = extractHST(Image(self.conf['segmap']), self.imMUSE)
 
         # catalog: check for potential discrepancy between the catalog and the
@@ -89,13 +71,10 @@ class ODHIN:
 
         self.params = Params(**self.conf.get('params', {}))
 
-        # if nothing provided take the first of the HST images
-        if 'hr_ref_image' in self.conf:
-            self.imHST = Image(self.conf['hr_ref_image'])
-        else:
-            self.imHST = self.hstimages[0]
-
-        self.imHST = extractHST(self.imHST, self.imMUSE)
+        # Reference HR image
+        ref_info = self.conf['hr_bands'][self.conf['hr_ref_band']]
+        self.imHST = extractHST(Image(ref_info['file']), self.imMUSE)
+        self.imHST.primary_header['photflam'] = ref_info.get('photflam', 1)
 
     @staticmethod
     def set_loglevel(level):
@@ -118,7 +97,7 @@ class ODHIN:
             kernel_transfert = calcMainKernelTransfert(self.params, self.imHST)
 
         self.groups, self.imLabel = doGrouping(
-            self.cube, self.imHST, self.segmap, self.imMUSE, self.cat,
+            self.imHST, self.segmap, self.imMUSE, self.cat,
             kernel_transfert, params=self.params, verbose=verbose)
 
         names = ('G_ID', 'nbSources', 'listIDs', 'Area')
@@ -152,11 +131,9 @@ class ODHIN:
                 continue
 
             self.logger.debug('deblending group %d', group.GID)
-            # args: subcube, subhstimages, subsegmap
-            args = prepare_inputs(self.cube, self.hstimages, self.segmap,
-                                  group.region)
+            # args: subcube, subsegmap
             outfile = str(self.output_dir / f'group_{group.GID:05d}.fits')
-            to_process.append((*args, group, outfile))
+            to_process.append((group, outfile, self.conf))
 
         # Determine the number of processes:
         # - default: all CPUs except one.

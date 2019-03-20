@@ -9,27 +9,27 @@ import numpy as np
 import scipy.signal as ssl
 
 from astropy.table import Table
-from mpdaf.obj import Spectrum
+from mpdaf.obj import Spectrum, Image, Cube
 from mpdaf.sdetect import Source
 from scipy.ndimage import median_filter
 
-from .regularization import regulDeblendFunc
-from .parameters import Params
-from .deblend_utils import (convertFilt, convertIntensityMap,
+from .deblend_utils import (load_filter, convertIntensityMap, extractHST,
                             getMainSupport, generatePSF_HST, getBlurKernel)
+from .parameters import Params
+from .regularization import regulDeblendFunc
 from .version import __version__
 
 
-def deblendGroup(subcube, subhstimages, subsegmap, group, outfile):
+def deblendGroup(group, outfile, conf):
     logger = logging.getLogger(__name__)
     logger.debug('group %d, start', group.GID)
-    debl = Deblending(subcube, subhstimages)
+    debl = Deblending(group, conf)
     logger.debug('group %d, createIntensityMap', group.GID)
-    debl.createIntensityMap(subsegmap.data.filled(0.))
+    debl.createIntensityMap()
     logger.debug('group %d, findSources', group.GID)
     debl.findSources()
     logger.debug('group %d, write', group.GID)
-    debl.write(outfile, group)
+    debl.write(outfile)
     logger.debug('group %d, done', group.GID)
 
 
@@ -41,13 +41,11 @@ class Deblending:
     ----------
     cube : mpdaf Cube
         The Cube object to be deblended
-    imagesHR:
-        HR images
-    listFiltName : list of filenames
-        List of filenames of HST response filters.
     nbands : int
         The number of MUSE spectral bins to consider for computation.
         MUSE FSF is assumed constant within a bin.
+    conf : dict
+        The settings dict.
 
     Attributes
     ----------
@@ -67,17 +65,33 @@ class Deblending:
 
     """
 
-    def __init__(self, cube, imagesHR, params=None):
+    def __init__(self, group, conf):
+        self.params = Params(**conf.get('params', {}))
+        self.group = group
 
-        self.cube = cube
-        if params is None:
-            params = Params()
-        self.params = params
+        cube = Cube(conf['cube'])
+        self.cube = cube = cube[:, group.region.sy, group.region.sx]
         self.cubeLR = cube.data.filled(np.ma.median(cube.data))
         self.cubeLRVar = cube.var.filled(np.ma.median(cube.var))
-        # self.wcs = cube.wcs
-        # self.wave = cube.wave
-        self.listImagesHR = imagesHR
+        im = cube[0]
+
+        self.segmap = extractHST(Image(conf['segmap']), im)
+
+        # load the HR images and filters
+        self.listImagesHR = []
+        self.filtResp = []
+        lbda = cube.wave.coord()
+        for band, d in conf['hr_bands'].items():
+            imhr = extractHST(Image(d['file']), im)
+            # store the flux conversion factor in the header
+            imhr.primary_header['photflam'] = d.get('photflam', 1)
+            self.listImagesHR.append(imhr)
+
+            if 'filter' in d:
+                filt = load_filter(d['filter'], lbda)
+            else:
+                filt = np.ones(cube.shape[0])
+            self.filtResp.append(filt)
 
         # get FSF parameters
         fsf_a = self.params.fsf_a_muse
@@ -90,24 +104,11 @@ class Deblending:
         self.bands_center = np.mean([lb[:-1], lb[1:]], axis=0)
         self.listFWHM = fsf_a + fsf_b * self.bands_wl
 
-        # FIXME: listFiltName should match the input HR images
-        if self.params.listFiltName is not None:
-            self.filtResp = [convertFilt(np.loadtxt(filtName), self.cube.wave)
-                             for filtName in self.params.listFiltName]
-        else:
-            self.filtResp = [np.ones(self.cube.shape[0])] * 4
-
-        # needeed for muse_analysis functions
-        # FIXME: remove harcoded list here, is it still needed ?
-        filters = ['f606w', 'f775w', 'f814w', 'f850lp']
-        for k, im in enumerate(self.listImagesHR):
-            im.primary_header['FILTER'] = filters[k]
-
         # spatial shapes
-        self.shapeLR = self.cube.shape[1:]
+        self.shapeLR = cube.shape[1:]
 
-        self.residuals = np.zeros((self.cube.shape[0], np.prod(self.shapeLR)))
-        self.estimatedCube = self.cube.clone()
+        self.residuals = np.zeros((cube.shape[0], np.prod(self.shapeLR)))
+        self.estimatedCube = cube.clone()
         self.PSF_HST = generatePSF_HST(self.params.alpha_hst,
                                        self.params.beta_hst)
 
@@ -127,20 +128,12 @@ class Deblending:
             listBands.append(list(bands_idx[0]))
         return listBands
 
-    def createIntensityMap(self, segmap, thresh=None):
-        """
-        Create intensity maps from HST images and segmentation map.
-        To be called before calling findSources()
-
-        Parameters
-        ----------
-        segmap : `ndarray`
-            Segmentation map.
-        thres : (not used if segmap)
-            Threshold to use on HST image to segment.
-
+    def createIntensityMap(self):
+        """Create intensity maps from HST images and segmentation map.
+        To be called before calling findSources().
         """
         # List of all HST ids in the segmap
+        segmap = self.segmap.data.filled(0)
         hst_ids = np.unique(segmap)
         self.listHST_ID = ['bg'] + sorted(hst_ids[hst_ids > 0])
         self.nbSources = len(self.listHST_ID)  # include background
@@ -413,7 +406,8 @@ class Deblending:
         mat /= mat.sum(axis=1)[:, None]
         return np.linalg.cond(mat)
 
-    def write(self, outfile, group):
+    def write(self, outfile):
+        group = self.group
         origin = ('Odhin', __version__, self.cube.filename,
                   self.cube.primary_header.get('CUBE_V', ''))
         src = Source.from_data(group.GID, group.region.ra, group.region.dec,
