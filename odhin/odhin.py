@@ -6,18 +6,23 @@ import logging
 import multiprocessing
 import numpy as np
 import pathlib
+import warnings
 
 from astropy.io import fits
 from astropy.table import Table, vstack, join
 from mpdaf import CPU
 from mpdaf.obj import Cube, Image
 from mpdaf.sdetect import Catalog
+from mpdaf.tools import MpdafUnitsWarning
 
 from .deblend import deblendGroup
 from .utils import (calcMainKernelTransfert, get_fig_ax, cmap,
                     extractHST, check_segmap_catalog, ProgressBar)
 from .grouping import doGrouping
 from .parameters import Params, load_settings
+
+# Ignore units warnings from MPDAF
+warnings.simplefilter('ignore', MpdafUnitsWarning)
 
 
 def _worker_deblend(group, outfile, conf):
