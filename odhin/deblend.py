@@ -13,8 +13,8 @@ from mpdaf.obj import Spectrum, Image, Cube
 from mpdaf.sdetect import Source
 from scipy.ndimage import median_filter
 
-from .deblend_utils import (load_filter, convertIntensityMap, extractHST,
-                            getMainSupport, generatePSF_HST, getBlurKernel)
+from .utils import (load_filter, convertIntensityMap, extractHST,
+                    getMainSupport, generatePSF_HST, getBlurKernel)
 from .parameters import Params
 from .regularization import regulDeblendFunc
 from .version import __version__

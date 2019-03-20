@@ -11,7 +11,7 @@ import logging
 import numpy as np
 from skimage.measure import regionprops, label
 
-from .deblend_utils import createIntensityMap, ProgressBar
+from .utils import createIntensityMap, ProgressBar
 
 
 class SourceGroup:

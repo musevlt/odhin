@@ -14,8 +14,8 @@ from mpdaf.obj import Cube, Image
 from mpdaf.sdetect import Catalog
 
 from .deblend import deblendGroup
-from .deblend_utils import (calcMainKernelTransfert, get_fig_ax, cmap,
-                            extractHST, check_segmap_catalog, ProgressBar)
+from .utils import (calcMainKernelTransfert, get_fig_ax, cmap,
+                    extractHST, check_segmap_catalog, ProgressBar)
 from .grouping import doGrouping
 from .parameters import Params, load_settings
 
