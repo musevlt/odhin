@@ -67,10 +67,8 @@ def generatePSF_HST(alphaHST, betaHST, shape=(375, 375), shapeMUSE=(25, 25)):
 
 
 def getMainSupport(u, alpha=0.999):
-    """
-    Get mask containing a fraction alpha of total map intensity.
-    """
-    mask = np.zeros_like(u).astype(bool)
+    """Get mask containing a fraction alpha of total map intensity."""
+    mask = np.zeros_like(u, dtype=bool)
     for i, row in enumerate(u):
         s = np.cumsum(np.sort(row)[::-1])
         keepNumber = np.sum(s < alpha * s[-1])

@@ -1,8 +1,8 @@
 import numpy as np
 import scipy.stats as sst
-import scipy.signal as ssl
 from astropy.stats import mad_std
 from scipy.ndimage.morphology import grey_dilation
+from scipy.signal import fftconvolve
 
 
 def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
@@ -39,23 +39,27 @@ def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
         if True, reject peaks where immediate neighbors of extrema are not
         > 1 std (maxima) or < -1 std (minima).
 
-    Output:
+    Output
     ------
-        listMask : list of masks (each mask is a boolean array of size lambda)
-
-
+    listMask
+        list of masks (each mask is a boolean array of size lambda)
 
     """
     if filt is None:
         filt = sst.norm.pdf(np.linspace(-2 * w, 2 * w, 4 * w + 1), scale=w)
-        filt = filt / np.linalg.norm(filt)
-    listMask = []
-    for l in range(len(listSpe)):
-        spe = listSpe[l]
-        sig = mad_std(spe)  # compute standard deviation estimator from MAD
+        filt /= np.linalg.norm(filt)
 
-        spe_filt = ssl.fftconvolve(
-            spe, filt, mode='same')  # matched filter using filt
+    # generate kernels for estimation of line width
+    listWidth = np.concatenate([np.array([0.1]),
+                                np.arange(1, 2 * wmax + 2, 2)])
+    listKernel = genKernels(listWidth=listWidth, n=2 * wmax + 1, n_sig=n_sig)
+
+    listMask = []
+    for spe in listSpe:
+        # compute standard deviation estimator from MAD
+        sig = mad_std(spe)
+        # matched filter using filt
+        spe_filt = fftconvolve(spe, filt, mode='same')
         # compute standard deviation estimator of filtered data from MAD
         sig_filt = mad_std(spe_filt)
         lRejected = 0
@@ -67,42 +71,41 @@ def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
         listArgExtrema = np.nonzero(np.abs(spe_filt) > B)[0]
         listExtrema = spe_filt[listArgExtrema]
 
-        # generate kernels for estimation of line width
-        listKernel = genKernels(listWidth=np.concatenate(
-            [np.array([0.1]), np.arange(1, 2 * wmax + 2, 2)]), n=2 * wmax + 1, n_sig=n_sig)
-
         # compute number of kept extrema after thresholding
         nThresh = np.sum(np.abs(spe_filt[listArgExtrema]) > alpha * sig_filt)
 
-        for k, m in zip(listArgExtrema, listExtrema):
-            if (np.abs(spe_filt[k]) > alpha * sig_filt) and ((localConstraint == False)
-                                                             or (spe[np.maximum(k - 1, 0):k + 2] > np.sign(spe[k]) * sig).all()):
-                mask = np.zeros_like(spe).astype(bool)
+        for k, extrema in zip(listArgExtrema, listExtrema):
+            if (np.abs(extrema) > alpha * sig_filt) and (
+                    (localConstraint is False) or np.all(
+                        spe[np.maximum(k - 1, 0):k + 2] > np.sign(spe[k]) * sig
+                    )):
+                mask = np.zeros_like(spe, dtype=bool)
                 kmin = np.maximum(k - wmax, 0)
 
                 # create sub spectrum of good size for width estimation
                 if k - wmax < 0:
-                    line = np.concatenate(
-                        [np.zeros(wmax - k), spe[kmin:k + wmax + 1]])
+                    line = np.concatenate([np.zeros(wmax - k),
+                                           spe[kmin:k + wmax + 1]])
                 elif wmax + k + 1 > len(spe):
-                    line = np.concatenate(
-                        [spe[kmin:k + wmax + 1], np.zeros(k + wmax + 1 - len(spe))])
+                    line = np.concatenate([spe[kmin:k + wmax + 1],
+                                           np.zeros(k + wmax + 1 - len(spe))])
                 else:
                     line = spe[kmin:k + wmax + 1]
 
                 # width line estimation
                 line = line / np.linalg.norm(line)
-                width = calcWidth(line, listKernel=listKernel, n_sig=n_sig, listWidth=np.concatenate(
-                    [np.array([0.1]), np.arange(1, 2 * wmax + 2, 2)]))
+                width = calcWidth(line, listKernel=listKernel, n_sig=n_sig,
+                                  listWidth=listWidth)
                 width = int(width)
 
                 # keep only peaks larger than minimal width
                 if width >= 2 * wmin + 1:
                     if len(np.nonzero(
                             spe[np.maximum(k - width, 0):k] < beta * sig)[0]) > 0:
-                        a = np.maximum(k - width,
-                                       1) + np.nonzero(spe[np.maximum(k - width,
-                                                                      0):k] < beta * sig)[0][-1] - 1
+                        a = (np.maximum(k - width, 1) +
+                             np.nonzero(
+                                 spe[np.maximum(k - width, 0):k] < beta * sig
+                             )[0][-1] - 1)
                     else:
                         a = np.maximum(k - width, 0)
                     if len(np.nonzero(
@@ -123,10 +126,12 @@ def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
 
                 mask[a:b] = True
                 listMask.append(mask)
+
     if returnAll:
         return (listMask, lRejected, len(listExtrema), nThresh, listExtrema,
                 listArgExtrema, spe_filt, sig_filt, sig)
-    return listMask
+    else:
+        return listMask
 
 
 def genKernels(listWidth=np.arange(5, 42, 2), n=41, n_sig=2):
@@ -152,7 +157,8 @@ def genKernels(listWidth=np.arange(5, 42, 2), n=41, n_sig=2):
     x = np.linspace(-20, 20, n)
     for k in listWidth:
         g = sst.norm.pdf(x, scale=k / (n_sig * 2.))
-        listKernel.append(g / np.linalg.norm(g))
+        g /= np.linalg.norm(g)
+        listKernel.append(g)
     return listKernel
 
 

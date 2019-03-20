@@ -39,6 +39,7 @@ def glasso_bic(X, Y, ng=2, multivar=True, listMask=None, returnCriterion=False,
     coeff = np.zeros((X.shape[1], Y.shape[1]))
     criterion = []
     intercepts = np.zeros((1, Y.shape[1]))
+
     if listMask is None:
         for k in range(Y.shape[1]):
             res = lasso_bic(X, Y[:, np.maximum(0, k - ng):k + ng + 1],
@@ -57,7 +58,8 @@ def glasso_bic(X, Y, ng=2, multivar=True, listMask=None, returnCriterion=False,
 
     if returnCriterion:
         return coeff, intercepts, criterion
-    return coeff, intercepts
+    else:
+        return coeff, intercepts
 
 
 def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
@@ -96,16 +98,13 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
         Y_all = Y.copy()
         Y = np.mean(Y, axis=1)[:, None]
 
-    n_samples = X.shape[0]
     n_models = X.shape[1]
-    n_targets = Y.shape[1]
-    coef_path_ = []
     if returnAll:
         coef_path_all = []
-    listComb = []
 
     if not greedy:
         # compute all possible combinations of non-nul objects
+        listComb = []
         for k in range(1, n_models + 1):
             listComb += [i for i in itertools.combinations(
                 np.arange(n_models), k)]
@@ -114,7 +113,7 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
         # data in the remaining regressors
         listComb = [[]]
         listModels = list(range(n_models))
-        lprod = [np.mean(np.dot(X[:, i], Y)) for i in listModels]
+        lprod = np.dot(X.T, Y).mean(axis=1)
         a = np.argmax(np.abs(lprod))
         residuals = Y - (lprod[a] / np.linalg.norm(X[:, a]) * X[:, a])[:, None]
         listModels.pop(a)
@@ -129,18 +128,21 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
             listComb.append(listComb[k - 1] + [a_m])
 
     # center data
-    X_offset = np.average(X, axis=0)
-    Y_offset = np.average(Y, axis=0)
-    X = X - X_offset
-    Y = Y - Y_offset
+    X_offset = np.mean(X, axis=0)
+    Y_offset = np.mean(Y, axis=0)
+    X -= X_offset
+    Y -= Y_offset
 
     # compute the coeffs (estimated spectra) for each possible model.
+    coef_path_ = []
     for ind in listComb:
         coef_path_.append(np.linalg.lstsq(X[:, ind], Y, rcond=None)[0])
         if returnAll:
-            coef_path_all.append(np.linalg.lstsq(
-                X[:, ind], Y_all, rcond=None)[0])
+            coef_path_all.append(np.linalg.lstsq(X[:, ind], Y_all,
+                                                 rcond=None)[0])
 
+    n_samples = X.shape[0]
+    n_targets = Y.shape[1]
     K = np.log(n_samples * n_targets)  # BIC factor
 
     # compute mean squared errors
@@ -203,11 +205,11 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
         else:
             coeff[listComb[n_best], :] = coef_path_[n_best]
 
-    intercepts = Y_offset - np.dot(X_offset, coeff)
-
     if returnAll:
         return coef_path_all, likelihood, penalty
-    return coeff, intercepts, np.concatenate([np.array([r0]), criterion_])
+    else:
+        intercepts = Y_offset - np.dot(X_offset, coeff)
+        return coeff, intercepts, np.concatenate([np.array([r0]), criterion_])
 
 
 def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None,
@@ -240,18 +242,17 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None,
     coeff = np.zeros((X.shape[1], Y.shape[1]))
     intercepts = np.zeros((1, Y.shape[1]))
     # FIXME: not used, remove ?
-    RCV_slid = sklm.RidgeCV(alphas=alphas, fit_intercept=True, normalize=True,
-                            store_cv_values=True)
+    # RCV_slid = sklm.RidgeCV(alphas=alphas, fit_intercept=True,
+    #                         normalize=True, store_cv_values=True)
     listAlpha = np.zeros((Y.shape[1]))
     listRSS = []
 
     X_centr = X - np.mean(X, axis=0)
     Y_centr = Y - np.mean(Y, axis=0)
 
-    for x in range(X_centr.shape[1]):
-        X_centr[:, x] = X_centr[:, x] / np.linalg.norm(X_centr[:, x])
+    X_centr /= np.linalg.norm(X_centr, axis=0)
 
-    for k in range(int(np.ceil(Y.shape[1] / float(ng)))):
+    for k in range(int(np.ceil(Y.shape[1] / ng))):
         # prefered method : gcv_spe
         alpha, rss = gridge_gcv_spectral(
             X_centr, Y_centr[:, k * ng:(k + 1) * ng], alphas=alphas,
@@ -396,9 +397,7 @@ def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
     else:  # find lines support
         # First we compute one spectrum per object (rough estimation by summing
         # over each intensity map)
-        listSpe = []
-        for i in range(X.shape[1]):
-            listSpe.append(np.dot(X[:, i:i + 1].T, Y_l)[0])
+        listSpe = np.dot(X.T, Y_l)
 
         # Then we seek all spectral lines on this bunch of spectra
         listMask = getLinesSupportList(listSpe, w=2, wmax=20, wmin=2,
@@ -412,8 +411,8 @@ def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
 
     # we now work on remaining data Y_c
     # FIXME: not used, remove ?
-    X1 = X[support, :]
-    Y_c1 = Y_c[support, :]
+    # X1 = X[support, :]
+    # Y_c1 = Y_c[support, :]
 
     # preferred method : sliding Ridge GCV
     c_coeff, c_intercepts, c_alphas, listRSS = gridge_cv(
@@ -424,9 +423,8 @@ def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
     # positions in result arrays
     listA = np.ones((X.shape[1] + 1, Y.shape[1]))
 
-    r = corrFlux(X, Y_c, c_coeff)
-    c_coeff = r[0]
-    listA[1:, :] = r[1][:, None]
+    c_coeff, la = corrFlux(X, Y_c, c_coeff)
+    listA[1:, :] = la[:, None]
 
     # combine coeffs from lines and continuum
     res = c_coeff + l_coeff
@@ -437,17 +435,17 @@ def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
 
 
 def corrFlux(X, Y, beta):
-    """
-    Correct coefficients to limit flux loss
+    """Correct coefficients to limit flux loss.
+
     We seek a diagonal matrix A to minimize ||Y-X*A*beta||^2 with A_ii>=1
     (as we know there has been some flux loss).
 
     Parameters
     ----------
     X : 2d array (n pixels  x  k objects)
-            regressors (intensityMaps)
+        regressors (intensityMaps)
     Y : 2d array (n pixels  x lambda wavelengths)
-            data
+        data
     beta : 2d array (k objects x lambda wavelengths)
         spectra
 
@@ -457,11 +455,12 @@ def corrFlux(X, Y, beta):
         corrected spectra
     listA : 1d array (k objects)
         correction factors
+
     """
     niter = 5
     beta_c = beta.copy()
     listA = np.ones(X.shape[1])
-    listI = np.zeros(X.shape[1]).astype(bool)
+    listI = np.zeros(X.shape[1], dtype=bool)
     k = 0
     while (False in listI) and k < niter:  # iter until no coeff is under one.
         if k == 0:
@@ -475,6 +474,6 @@ def corrFlux(X, Y, beta):
             else:
                 listA[i] = a
         k = k + 1
-    for i, a in enumerate(listA):
-        beta_c[i, :] = beta_c[i, :] * a
+
+    beta_c *= listA[:, None]
     return beta_c, listA
