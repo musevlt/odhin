@@ -10,9 +10,8 @@ Store methods for
 import logging
 import numpy as np
 from skimage.measure import regionprops, label
-from tqdm import tqdm
 
-from .deblend_utils import createIntensityMap
+from .deblend_utils import createIntensityMap, ProgressBar
 
 
 class SourceGroup:
@@ -109,7 +108,7 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
     groups = []
     regions = regionprops(imLabel)
     if verbose:
-        regions = tqdm(regions)
+        regions = ProgressBar(regions)
 
     for skreg in regions:
         # Build a RegionAttr object from a skimage region

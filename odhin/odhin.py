@@ -6,7 +6,6 @@ import logging
 import multiprocessing
 import numpy as np
 import pathlib
-import tqdm
 
 from astropy.io import fits
 from astropy.table import Table, vstack
@@ -16,7 +15,7 @@ from mpdaf.sdetect import Catalog
 
 from .deblend import deblendGroup
 from .deblend_utils import (calcMainKernelTransfert, get_fig_ax, cmap,
-                            extractHST, check_segmap_catalog)
+                            extractHST, check_segmap_catalog, ProgressBar)
 from .grouping import doGrouping
 from .parameters import Params, load_settings
 
@@ -176,7 +175,7 @@ class ODHIN:
             if verbose:
                 ntasks = len(listGroupToDeblend)
                 # add progress bar
-                pbar = tqdm.tqdm(total=ntasks)
+                pbar = ProgressBar(total=ntasks)
 
                 def update(*a):
                     pbar.update()
@@ -211,7 +210,7 @@ class ODHIN:
 
     def plotGroups(self, ax=None, groups=None, linewidth=1):
         """
-        ax : matplotlib axe
+        ax : matplotlib axis
         groups: list of groups
         """
         import matplotlib.patches as mpatches
@@ -230,7 +229,7 @@ class ODHIN:
 
     def plotAGroup(self, ax=None, group_id=None):
         """
-        ax : matplotlib axe
+        ax : matplotlib axis
         group_id: group id
         """
         assert group_id is not None
@@ -252,7 +251,7 @@ class ODHIN:
     def plotHistArea(self, ax=None, nbins='auto'):
         """Plot histogram of group areas.
 
-        ax : matplotlib axe
+        ax : matplotlib axis
         nbins: number of bins for histogram
         """
         ax = get_fig_ax(ax)
@@ -261,7 +260,7 @@ class ODHIN:
     def plotHistNbS(self, ax=None, nbins='auto'):
         """Plot histogram of group number of sources.
 
-        ax : matplotlib axe
+        ax : matplotlib axis
         nbins: number of bins for histogram
         """
         ax = get_fig_ax(ax)
