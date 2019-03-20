@@ -416,7 +416,8 @@ class Deblending:
     def write(self, outfile, group):
         origin = ('Odhin', __version__, self.cube.filename,
                   self.cube.primary_header.get('CUBE_V', ''))
-        src = Source.from_data(group.GID, 0, 0, origin=origin)
+        src = Source.from_data(group.GID, group.region.ra, group.region.dec,
+                               origin=origin)
 
         cond_number = self.calcCondNumber(group.idxSources)
         src.header['GRP_ID'] = group.GID

@@ -8,7 +8,7 @@ import numpy as np
 import pathlib
 
 from astropy.io import fits
-from astropy.table import Table, vstack
+from astropy.table import Table, vstack, join
 from mpdaf import CPU
 from mpdaf.obj import Cube, Image
 from mpdaf.sdetect import Catalog
@@ -195,9 +195,11 @@ class ODHIN:
         self.build_result_table()
 
     def build_result_table(self):
-        tables = [Table.read(f, hdu='TAB_SOURCES')
-                  for f in self.output_dir.glob('group_*.fits')]
-        self.table_sources = vstack(tables)
+        tables = vstack([Table.read(f, hdu='TAB_SOURCES')
+                         for f in self.output_dir.glob('group_*.fits')])
+        cat = Table([[str(x) for x in self.cat['ID']], self.cat['RA'],
+                     self.cat['DEC']], names=('ID', 'RA', 'DEC'))
+        self.table_sources = join(tables, cat, keys=['ID'], join_type='left')
         return self.table_sources
 
     def plotGroups(self, ax=None, groups=None, linewidth=1):

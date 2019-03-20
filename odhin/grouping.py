@@ -34,7 +34,7 @@ class RegionAttr:
     Get region attributes from skimage region properties
     """
 
-    __slots__ = ('area', 'centroid', 'sx', 'sy')
+    __slots__ = ('area', 'centroid', 'sx', 'sy', 'ra', 'dec')
 
     def __init__(self, area, centroid, sy, sx):
         self.area = area
@@ -48,6 +48,9 @@ class RegionAttr:
         sy = slice(min_row, max_row)
         sx = slice(min_col, max_col)
         return cls(reg.area, reg.centroid, sy, sx)
+
+    def compute_sky_centroid(self, wcs):
+        self.dec, self.ra = wcs.pix2sky(self.centroid)[0]
 
     @property
     def bbox_area(self):
@@ -113,6 +116,7 @@ def doGrouping(cube, imHR, segmap, imMUSE, cat, kernel_transfert, params,
     for skreg in regions:
         # Build a RegionAttr object from a skimage region
         region = RegionAttr.from_skimage(skreg)
+        region.compute_sky_centroid(imMUSE.wcs)
         region.ensureMinimalBbox(params.min_width, imLabel,
                                  params.min_sky_pixels, params.margin_bbox)
         bboxHR = region.convertToHR(segmap, imMUSE)
