@@ -339,11 +339,6 @@ def _diag_dot(D, B):
     return D * B
 
 
-def _decomp_diag(v_prime, Q):
-    """compute diagonal of the matrix: dot(Q, dot(diag(v_prime), Q^T))"""
-    return (v_prime * Q ** 2).sum(axis=-1)
-
-
 def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
                      alpha_c=0.0001, support=None, trueLines=None,
                      alphas=np.logspace(-5, 2, 50), filt_w=101, Y_sig2=None):

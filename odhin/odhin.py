@@ -200,14 +200,6 @@ class ODHIN:
         self.table_sources = vstack(tables)
         return self.table_sources
 
-        # self.table_groups.loc[group_id]['Xi2'] = xi2
-        # self.table_groups.loc[group_id]['Condition Number'] = cond_number
-
-        # self.results['Table Groups'] = self.table_groups
-        # self.results['Table Sources'] = self.table_sources
-
-    # Plotting functions
-
     def plotGroups(self, ax=None, groups=None, linewidth=1):
         """
         ax : matplotlib axis

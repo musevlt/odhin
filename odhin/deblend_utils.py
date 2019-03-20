@@ -457,15 +457,6 @@ def check_segmap_catalog(segmap, cat):
     return cat
 
 
-# def get_cat_from_segmap(segmap):
-#     """
-#     Get IDs and center directly from a segmap (thus removing the need for
-#     an external catalag
-#     """
-#     # To be build
-#     pass
-
-
 def extractHST(imHST, imMUSE, rot=True):
     """
     Extract HST image corresponding to MUSE image.
