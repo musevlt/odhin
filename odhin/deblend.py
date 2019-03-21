@@ -7,6 +7,7 @@ import astropy.units as units
 import logging
 import numpy as np
 import scipy.signal as ssl
+import yaml
 
 from astropy.table import Table
 from mpdaf.obj import Spectrum, Image, Cube
@@ -32,7 +33,7 @@ def deblendGroup(group, outfile, conf):
     logger.debug('group %d, findSources', group.GID)
     debl.findSources()
     logger.debug('group %d, write', group.GID)
-    debl.write(outfile)
+    debl.write(outfile, conf)
     logger.debug('group %d, done', group.GID)
 
 
@@ -409,7 +410,7 @@ class Deblending:
         mat /= mat.sum(axis=1)[:, None]
         return np.linalg.cond(mat)
 
-    def write(self, outfile):
+    def write(self, outfile, conf):
         group = self.group
         origin = ('Odhin', __version__, self.cube.filename,
                   self.cube.primary_header.get('CUBE_V', ''))
@@ -446,5 +447,13 @@ class Deblending:
         src.cubes['MUSE'] = self.cube
         src.cubes['FITTED'] = self.estimatedCube
         src.images['MUSE_WHITE'] = self.cube.mean(axis=0)
+        src.cubes['FITTED'] = self.estimatedCube.mean(axis=0)
+
+        # save params
+        src.header.add_comment('')
+        src.header.add_comment('ODHIN PARAMETERS:')
+        src.header.add_comment('')
+        for line in yaml.dump(conf).splitlines():
+            src.header.add_comment(line)
 
         src.write(outfile)
