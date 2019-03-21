@@ -20,6 +20,8 @@ hr_ref_band: "F606W"
 #
 # http://www.stsci.edu/hst/acs/analysis/zeropoints
 # https://acszeropoints.stsci.edu/results_all/?date=&detector=WFC
+# There is also a Python API here:
+# https://acstools.readthedocs.io/en/latest/acszpt.html
 #
 hr_bands:
   F606W:
