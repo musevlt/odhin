@@ -1,0 +1,49 @@
+# The variables defined here are substitued in the file.
+vars:
+  muse_path: "/path/to/muse/data"
+  hst_path: "/path/to/hst/data"
+
+# Low Resolution data:
+# the cube to deblend, and optionally its white-light image
+cube: "{muse_path}/DATACUBE_UDF-10.fits"
+white: "{muse_path}/IMAGE_UDF-10.fits"
+
+# High Resolution data:
+# segmentation map and associated catalog, list of images
+segmap: "{hst_path}/SegMap/segmentation_map_rafelski_2015.fits"
+catalog: "{hst_path}/Catalogs/uvudf_rafelski_2015.fits"
+hr_ref_band: "F606W"
+
+# Definition of HR bands, for which we need the file, the filter, and
+# for HST the calibration factor to convert pixel values in electrons/s
+# to erg cm-2 s-1 Angstrom-1.
+#
+# http://www.stsci.edu/hst/acs/analysis/zeropoints
+# https://acszeropoints.stsci.edu/results_all/?date=&detector=WFC
+#
+hr_bands:
+  F606W:
+    file: "{hst_path}/XUDF/hlsp_xdf_hst_acswfc-30mas_hudf_f606w_v1_sci.fits"
+    filter: "{hst_path}/Filters/HST_ACS_WFC.F606W_81.dat"
+    photflam: 7.73e-20
+  F775W:
+    file: "{hst_path}/XUDF/hlsp_xdf_hst_acswfc-30mas_hudf_f775w_v1_sci.fits"
+    filter: "{hst_path}/Filters/HST_ACS_WFC.F775W_81.dat"
+    photflam: 9.74e-20
+  F814W:
+    file: "{hst_path}/XUDF/hlsp_xdf_hst_acswfc-30mas_hudf_f814w_v1_sci.fits"
+    filter: "{hst_path}/Filters/HST_ACS_WFC.F814W_81.dat"
+    photflam: 7.05e-20
+  F850LP:
+    file: "{hst_path}/XUDF/hlsp_xdf_hst_acswfc-30mas_hudf_f850lp_v1_sci.fits"
+    filter: "{hst_path}/Filters/HST_ACS_WFC.F850LP_81.dat"
+    photflam: 1.50e-19
+
+# kernel HR -> LR to be used for preprocessing (grouping).
+# If none provided build transfer kernel from default parameters
+# kernel_transfert:
+
+# Parameters:
+# This will override the default parameters.
+params:
+  filt_w: 151
