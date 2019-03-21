@@ -8,8 +8,5 @@ setup(
                       'astropy', 'mpdaf', 'photutils', 'tqdm'],
     packages=find_packages(),
     zip_safe=False,
-    package_data={
-        'odhin': ['data/*.dat'],
-    },
     include_package_data=True,
 )
