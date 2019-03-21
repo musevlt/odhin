@@ -17,7 +17,15 @@ ODHIN has the following strict requirements:
 Installing with pip
 ===================
 
-ODHIN can be installed with pip::
+To install the development version, first clone the git repository::
 
-    pip install odhin
+    git clone https://git-cral.univ-lyon1.fr/raphael.bacher/deblend
 
+If you want to use conda, a preconfigured environment is available::
+
+    conda env create -f environment.yml
+    conda activate odhin3
+
+Then, you can install the package::
+
+    pip install .
