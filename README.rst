@@ -19,6 +19,8 @@ Example
 
 An example notebook is in ``notebooks/Example Odhin v2.ipynb``.
 
+An example settings file is given :doc:`here <settings>`.
+
 Binder
 ------
 

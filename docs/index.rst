@@ -14,6 +14,7 @@ Contents
    :maxdepth: 1
 
    installation
+   settings
    api
    changelog
 
