@@ -19,8 +19,11 @@ from .parameters import Params
 from .regularization import regulDeblendFunc
 from .version import __version__
 
+__all__ = ('Deblending', 'deblendGroup')
+
 
 def deblendGroup(group, outfile, conf):
+    """Deblend a given group."""
     logger = logging.getLogger(__name__)
     logger.debug('group %d, start', group.GID)
     debl = Deblending(group, conf)

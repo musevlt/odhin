@@ -13,6 +13,8 @@ from skimage.measure import regionprops, label
 
 from .utils import createIntensityMap, ProgressBar
 
+__all__ = ('SourceGroup', 'RegionAttr', 'doGrouping', 'getObjsInBlob')
+
 
 class SourceGroup:
 
@@ -105,8 +107,7 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
     intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE,
                                               kernel_transfert, params)
 
-    cut = params.cut
-    imLabel = label(intensityMapLRConvol > cut)
+    imLabel = label(intensityMapLRConvol > params.cut)
     groups = []
     regions = regionprops(imLabel)
     if verbose:
@@ -139,12 +140,15 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
 def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, subsegmap):
     """Return the index and IDs of sources in the blobs.
 
-    output
-    ------
-    listObjInBlob : list of simple indices (from 0 to nb of sources in
-    bounding box) of objects in the bounding box connected to the blob
-    listObjInBlob : list of catalog indices  of objects in the bounding
-    box connected to the blob
+    Returns
+    -------
+    listObjInBlob :
+        list of simple indices (from 0 to nb of sources in bounding box)
+        of objects in the bounding box connected to the blob.
+    listObjInBlob :
+        list of catalog indices  of objects in the bounding box connected
+        to the blob.
+
     """
     listHST_ID = np.unique(subsegmap)
     listHST_ID = listHST_ID[listHST_ID > 0]

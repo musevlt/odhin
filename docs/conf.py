@@ -171,10 +171,10 @@ texinfo_documents = [
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
-    # 'numpy': ('https://docs.scipy.org/doc/numpy/', None),
-    # 'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
+    'numpy': ('https://docs.scipy.org/doc/numpy/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
     # 'matplotlib': ('https://matplotlib.org/', None),
-    # 'astropy': ('http://docs.astropy.org/en/stable/', None)
+    'astropy': ('http://docs.astropy.org/en/stable/', None)
 }
 
 # autodoc_default_flags = ['members', 'special-members',

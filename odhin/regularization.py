@@ -29,8 +29,8 @@ def glasso_bic(X, Y, ng=2, multivar=True, listMask=None, returnCriterion=False,
     averaged : if True do the BIC selection on averaged data (before doing
     the regression on original data)
 
-    Output:
-    ------
+    Returns
+    -------
     coeff : estimated coefficients (spectra k x lmbda)
     intercepts : background (1 x lmbda)
     (criterion : list of BIC values)
@@ -88,8 +88,8 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
     averaged : if True do the BIC selection on averaged data (before doing
     the regression on original data)
 
-    Output:
-    ------
+    Returns
+    -------
     coeff : estimated coefficients (=spectra k x lmbda)
     intercepts : background (1 x lmbda)
 
@@ -232,8 +232,8 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None,
     support : mask of samples (pixels) with enough signal, where the cross
     validation will be applied
 
-    Output:
-    ------
+    Returns
+    -------
     coeff : estimated coefficients (spectra k x lmbda)
     intercepts : background (1 x lmbda)
 
@@ -290,8 +290,8 @@ def gridge_gcv_spectral(X, Y, support, alphas=np.logspace(-5, 2, 50),
         fraction of the max singular value of X that will be the
         upper limit for regularization parameter
 
-    Output:
-    ------
+    Returns
+    -------
     alpha : estimated regularization parameter
     rss : errors of prediction (ndarray n_targets,n_alphas)
 
@@ -359,8 +359,8 @@ def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
     ng : int
         size of spectral bin for regularization
 
-    Output:
-    ------
+    Returns
+    -------
     res: 2d array (k objects lambda wavelengths)
         estimation of objects spectra
     intercepts:
@@ -444,8 +444,8 @@ def corrFlux(X, Y, beta):
     beta : 2d array (k objects x lambda wavelengths)
         spectra
 
-    Output
-    ------
+    Returns
+    -------
     beta_c : 2d array (k objects x lambda wavelengths)
         corrected spectra
     listA : 1d array (k objects)

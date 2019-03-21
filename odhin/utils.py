@@ -7,12 +7,13 @@ import astropy.units as u
 import logging
 import numpy as np
 
-from astropy.io import ascii
 from astropy.table import Table, vstack
 from photutils import create_matching_kernel, TopHatWindow
 from scipy import ndimage
 from scipy.interpolate import interp1d
 from scipy.signal import fftconvolve
+
+__all__ = ('generatePSF_HST', 'generateMoffatIm', 'extractHST')
 
 
 def isnotebook():  # pragma: no cover

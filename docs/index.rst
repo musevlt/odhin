@@ -14,7 +14,6 @@ Contents
    :maxdepth: 1
 
    installation
-   tutorial
    api
    changelog
 

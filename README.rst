@@ -1,27 +1,21 @@
 Installation
 ============
 
-::
+To install the development version, first clone the git repository::
 
     git clone https://git-cral.univ-lyon1.fr/raphael.bacher/deblend
 
-With setup.py
-^^^^^^^^^^^^^
-
-::
-
-    python setup.py install
-
-With conda
-^^^^^^^^^^
-
-::
+If you want to use conda, a preconfigured environment is available::
 
     conda env create -f environment.yml
     conda activate odhin3
 
+Then, you can install the package::
+
+    pip install .
+
 Example
--------
+=======
 
 An example notebook is in ``notebooks/Example Odhin v2.ipynb``.
 

@@ -46,8 +46,13 @@ class ODHIN:
 
     Attributes
     ----------
-    table_groups
-    table_sources
+    table_groups : `astropy.table.Table`
+        Table computed by `ODHIN.grouping`, containing the information about
+        groups.
+    table_sources : `astropy.table.Table`
+        Table computed by `ODHIN.deblend`, containing the information about
+        the deblended sources.
+
     """
 
     def __init__(self, settings_file, output_dir):
@@ -83,14 +88,23 @@ class ODHIN:
 
     @staticmethod
     def set_loglevel(level):
+        """Change the logging level."""
         logger = logging.getLogger()
         logger.setLevel(level)
         logger.handlers[0].setLevel(level)
 
     def grouping(self, verbose=True, cut=None):
-        """
-        Segment all sources in a number of connected (at the MUSE resolution)
-        groups and build a table of the groups.
+        """Segment all sources in a number of connected (at the MUSE
+        resolution) groups and build a table of the groups.
+
+        Parameters
+        ----------
+        verbose : bool
+            If True, show a progress bar.
+        cut : float
+            Threshold on the convolved intensity map, to get the segmentation
+            image.
+
         """
         if cut is not None:
             self.params.cut = cut
@@ -113,9 +127,19 @@ class ODHIN:
                                   dtype=(int, int, tuple, float))
         self.table_groups.add_index('G_ID')
 
-    def deblend(self, listGroupToDeblend=None, cpu=None, verbose=True):
-        """
-        Parallelized deblending on a list of groups
+    def deblend(self, listGroupToDeblend=None, njobs=None, verbose=True):
+        """Parallelized deblending on a list of groups
+
+        Parameters
+        ----------
+        listGroupToDeblend : list
+            List of group indices to process. If not provided, all groups are
+            processed.
+        njobs : int
+            Number of process to run in parallel.
+        verbose : bool
+            If True, show a progress bar.
+
         """
         if self.groups is None:
             raise ValueError("No groups were defined. Please call a grouping "
@@ -147,8 +171,8 @@ class ODHIN:
         cpu_count = multiprocessing.cpu_count() - 1
         if CPU > 0 and CPU < cpu_count:
             cpu_count = CPU
-        if cpu is not None and cpu < cpu_count:
-            cpu_count = cpu
+        if njobs is not None and njobs < cpu_count:
+            cpu_count = njobs
 
         cpu_count = min(cpu_count, len(listGroupToDeblend))
         self.logger.debug('using %d cpus', cpu_count)
@@ -177,6 +201,11 @@ class ODHIN:
         self.build_result_table()
 
     def build_result_table(self):
+        """Build the result table from the sources.
+
+        This is called at the end of the `~ODHIN.deblend` method.
+
+        """
         tables = vstack([Table.read(f, hdu='TAB_SOURCES')
                          for f in self.output_dir.glob('group_*.fits')])
         cat = Table([[str(x) for x in self.cat['ID']], self.cat['RA'],
@@ -185,9 +214,15 @@ class ODHIN:
         return self.table_sources
 
     def plotGroups(self, ax=None, groups=None, linewidth=1):
-        """
+        """Plot the segmentation map and groups.
+
+        Parameters
+        ----------
         ax : matplotlib axis
-        groups: list of groups
+            Axis to use for the plot.
+        groups : list
+            List of groups.
+
         """
         import matplotlib.patches as mpatches
         ax = get_fig_ax(ax)
@@ -204,9 +239,15 @@ class ODHIN:
             ax.add_patch(rect)
 
     def plotAGroup(self, ax=None, group_id=None):
-        """
+        """Plot a group, with sources positions and contour.
+
+        Parameters
+        ----------
         ax : matplotlib axis
-        group_id: group id
+            Axis to use for the plot.
+        group_id : int
+            Group id.
+
         """
         assert group_id is not None
         ax = get_fig_ax(ax)
@@ -227,17 +268,27 @@ class ODHIN:
     def plotHistArea(self, ax=None, nbins='auto'):
         """Plot histogram of group areas.
 
+        Parameters
+        ----------
         ax : matplotlib axis
-        nbins: number of bins for histogram
+            Axis to use for the plot.
+        nbins : str or int
+            Number of bins for `matplotlib.pyplot.hist`.
+
         """
         ax = get_fig_ax(ax)
         ax.hist([group.region.area for group in self.groups], bins=nbins)
 
     def plotHistNbS(self, ax=None, nbins='auto'):
-        """Plot histogram of group number of sources.
+        """Plot histogram of the number of sources per group.
 
+        Parameters
+        ----------
         ax : matplotlib axis
-        nbins: number of bins for histogram
+            Axis to use for the plot.
+        nbins : str or int
+            Number of bins for `matplotlib.pyplot.hist`.
+
         """
         ax = get_fig_ax(ax)
         ax.hist([group.nbSources for group in self.groups], bins=nbins)

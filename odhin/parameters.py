@@ -7,6 +7,8 @@
 import numpy as np
 import yaml
 
+__all__ = ('DEFAULT_PARAMS', 'Params', 'load_settings')
+
 DEFAULT_PARAMS = {
     # Beta parameter for HST PSF Moffat model
     'beta_hst': 1.6,
@@ -39,6 +41,7 @@ DEFAULT_PARAMS = {
     # the background
     'min_sky_pixels': 20,
 }
+"""Default values for the parameters."""
 
 
 def load_settings(settings_file):
@@ -51,7 +54,13 @@ def load_settings(settings_file):
 
 
 class Params(dict):
+    """Provides access to parameters.
 
+    This is a `dict` subclass which is first filled with the default
+    parameters from `DEFAULT_PARAMS`, and then with the ``params`` dict from
+    the settings file.
+
+    """
     def __init__(self, **kwargs):
         # initialize dict with DEFAULT_PARAMS, and override with the provided
         # parameters (kwargs)
@@ -62,10 +71,12 @@ class Params(dict):
 
     @property
     def fwhm_muse(self):
+        """Return the MUSE FWHM computed at ``fsf_wavelength``."""
         return self.fsf_a_muse + self.fsf_b_muse * self.fsf_wavelength
 
     @property
     def alpha_hst(self):
+        """Return the alpha value for the Moffat PSF of HST."""
         # expressed in MUSE pixels
         return np.sqrt((self.fwhm_hst / 0.2 * 15) ** 2 /
                        (4 * (2**(1 / self.beta_hst) - 1)))

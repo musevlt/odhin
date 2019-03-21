@@ -39,8 +39,8 @@ def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
         if True, reject peaks where immediate neighbors of extrema are not
         > 1 std (maxima) or < -1 std (minima).
 
-    Output
-    ------
+    Returns
+    -------
     listMask
         list of masks (each mask is a boolean array of size lambda)
 
@@ -147,8 +147,8 @@ def genKernels(listWidth=np.arange(5, 42, 2), n=41, n_sig=2):
     n_sig: float
          A half-width corresponds to n_sig standard deviations.
 
-    Output
-    ----------
+    Returns
+    -------
     listKernel: list of 1d-array
         list of gaussian kernels with varying widths
 
@@ -178,8 +178,8 @@ def calcWidth(spe, listKernel=None, n_sig=1, listWidth=np.arange(5, 42, 2)):
     listWidth : list of int
         list of widths to be tested
 
-    Output
-    ----------
+    Returns
+    -------
     res : int
         estimated width
 
