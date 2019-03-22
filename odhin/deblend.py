@@ -85,7 +85,7 @@ class Deblending:
 
         # load the HR images and filters
         self.listImagesHR = []
-        self.filtResp = []
+        filtResp = []
         lbda = cube.wave.coord()
         for band, d in conf['hr_bands'].items():
             imhr = extractHST(Image(d['file']), im)
@@ -97,18 +97,18 @@ class Deblending:
                 filt = load_filter(d['filter'], lbda)
             else:
                 filt = np.ones(self.nlbda)
-            self.filtResp.append(filt)
-
-        # get FSF parameters
-        fsf_a = self.params.fsf_a_muse
-        fsf_b = self.params.fsf_b_muse
-        self.fsf_beta_muse = self.params.fsf_beta_muse
+            filtResp.append(filt)
+        self.filtResp = np.array(filtResp)
 
         self.nBands = self.params.nBands
-        l_min, l_max = cube.wave.get_range()
-        self.bands_wl = lb = np.linspace(l_min, l_max, self.nBands + 1)
-        self.bands_center = np.mean([lb[:-1], lb[1:]], axis=0)
-        self.listFWHM = fsf_a + fsf_b * self.bands_wl
+        # compute bands limit indices
+        idx = np.linspace(0, self.nlbda + 1, self.nBands + 1, dtype=int)
+        self.idxBands = np.array([idx[:-1], idx[1:]]).T
+
+        # compute FWHM at the center of bands
+        bands_center = self.cube.wave.coord(self.idxBands.mean(axis=1))
+        self.listFWHM = (self.params.fsf_a_muse +
+                         self.params.fsf_b_muse * bands_center)
 
         self.PSF_HST = generatePSF_HST(self.params.alpha_hst,
                                        self.params.beta_hst)
@@ -121,11 +121,12 @@ class Deblending:
         of the band limits has filter values > 0).
         """
         listBands = []
-        nl = len(filtResp[0])
-        lind = list(np.linspace(0, nl-1, nBands+1, dtype=int))
-        for i in range(len(filtResp)):
-            val = filtResp[i][lind]
-            bands_idx = np.where((val[:-1] > 0) | (val[1:] > 0))
+        nl = filtResp.shape[1]
+        lind = list(np.linspace(0, nl - 1, nBands + 1, dtype=int))
+        for filt in filtResp:
+            mask = filt[lind] > 0
+            # check if band limits have non-zero values
+            bands_idx = np.where(mask[:-1] | mask[1:])
             listBands.append(list(bands_idx[0]))
         return listBands
 
@@ -209,10 +210,7 @@ class Deblending:
             tmp_sources.append(np.zeros(shapeLR))
             tmp_var.append(np.zeros(shapeLR))
 
-            delta = int(self.nlbda / float(self.nBands))
-
-            for i in range(self.nBands):
-                imin, imax = i * delta, (i + 1) * delta
+            for i, (imin, imax) in enumerate(self.idxBands):
 
                 # Do the estimation only if MUSE band is in HST band
                 if i in self.listBands[j]:
@@ -222,7 +220,7 @@ class Deblending:
                         self.cube[0],
                         self.listImagesHR[j],
                         self.listFWHM[i],
-                        self.fsf_beta_muse,
+                        self.params.fsf_beta_muse,
                         self.listTransferKernel[i]
                     )
 
@@ -240,6 +238,7 @@ class Deblending:
                     # Y : n x lmbda
                     # Yvar : n x lmbda
 
+                    delta = imax - imin
                     U = intensityMapLRConvol.T
                     Y = cubeLR[imin:imax].reshape(delta, -1).T
                     if regul:
@@ -331,8 +330,9 @@ class Deblending:
         listTransferKernel = []
         for fwhm in self.listFWHM:
             # Build MUSE FSF
-            asq = fwhm**2 / 4.0 / (2.0**(1.0 / self.fsf_beta_muse) - 1.0)
-            im_muse = 1.0 / (1.0 + rsq / asq) ** self.fsf_beta_muse
+            asq = fwhm ** 2 / 4.0 / (
+                2.0 ** (1.0 / self.params.fsf_beta_muse) - 1.0)
+            im_muse = 1.0 / (1.0 + rsq / asq) ** self.params.fsf_beta_muse
             im_muse /= im_muse.sum()
             listTransferKernel.append(getBlurKernel(
                 imHR=psf_hst, imLR=im_muse, sizeKer=(21, 21)))
@@ -340,11 +340,10 @@ class Deblending:
 
     def _combineSpectra(self, tmp_sources, tmp_var):
         """Combine spectra estimated on each HST image."""
-        filtResp = np.array(self.filtResp)
-        weigthTot = np.ma.masked_values(filtResp.sum(axis=0), 0)
-        self.sources = np.sum(filtResp[:, None, :] * tmp_sources,
+        weigthTot = np.ma.masked_values(self.filtResp.sum(axis=0), 0)
+        self.sources = np.sum(self.filtResp[:, None, :] * tmp_sources,
                               axis=0) / weigthTot
-        self.varSources = np.sum(filtResp[:, None, :] * tmp_var,
+        self.varSources = np.sum(self.filtResp[:, None, :] * tmp_var,
                                  axis=0) / weigthTot
 
         # for background, get voxel mean instead of sum
@@ -359,14 +358,10 @@ class Deblending:
 
         """
         estimatedCube = np.zeros((self.nlbda, np.prod(self.shapeLR)))
-        delta = int(self.nlbda / float(self.nBands))
-        filtResp = np.array(self.filtResp)
-        weigthTot = np.ma.masked_values(filtResp.sum(axis=0), 0)
-        filtResp /= weigthTot
+        weigthTot = np.ma.masked_values(self.filtResp.sum(axis=0), 0)
+        filtResp = self.filtResp / weigthTot
 
-        for i in range(self.nBands):
-            imin, imax = i * delta, (i + 1) * delta
-
+        for i, (imin, imax) in enumerate(self.idxBands):
             estim = []
             for j, resp in enumerate(filtResp):
                 arr = np.dot(tmp_sources[j][:, imin:imax].T,
