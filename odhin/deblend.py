@@ -75,11 +75,13 @@ class Deblending:
 
         cube = Cube(conf['cube'])
         self.cube = cube = cube[:, group.region.sy, group.region.sx]
-        self.cubeLR = cube.data.filled(np.ma.median(cube.data))
-        self.cubeLRVar = cube.var.filled(np.ma.median(cube.var))
         im = cube[0]
 
-        self.segmap = extractHST(Image(conf['segmap']), im)
+        self.segmap = extractHST(Image(conf['segmap']), im).data.filled(0)
+
+        # spatial shapes
+        self.nlbda = cube.shape[0]
+        self.shapeLR = cube.shape[1:]
 
         # load the HR images and filters
         self.listImagesHR = []
@@ -94,7 +96,7 @@ class Deblending:
             if 'filter' in d:
                 filt = load_filter(d['filter'], lbda)
             else:
-                filt = np.ones(cube.shape[0])
+                filt = np.ones(self.nlbda)
             self.filtResp.append(filt)
 
         # get FSF parameters
@@ -108,11 +110,6 @@ class Deblending:
         self.bands_center = np.mean([lb[:-1], lb[1:]], axis=0)
         self.listFWHM = fsf_a + fsf_b * self.bands_wl
 
-        # spatial shapes
-        self.shapeLR = cube.shape[1:]
-
-        self.residuals = np.zeros((cube.shape[0], np.prod(self.shapeLR)))
-        self.estimatedCube = cube.clone()
         self.PSF_HST = generatePSF_HST(self.params.alpha_hst,
                                        self.params.beta_hst)
 
@@ -137,8 +134,7 @@ class Deblending:
         To be called before calling findSources().
         """
         # List of all HST ids in the segmap
-        segmap = self.segmap.data.filled(0)
-        hst_ids = np.unique(segmap)
+        hst_ids = np.unique(self.segmap)
         self.listHST_ID = ['bg'] + sorted(hst_ids[hst_ids > 0])
         self.nbSources = len(self.listHST_ID)  # include background
 
@@ -156,7 +152,7 @@ class Deblending:
             intensityMapHR[0] = 1
 
             for k, hst_id in enumerate(self.listHST_ID[1:], start=1):
-                mask = np.where(segmap == hst_id, data, 0)
+                mask = np.where(self.segmap == hst_id, data, 0)
                 intensityMapHR[k] = mask.ravel()
 
             self.listIntensityMapHR.append(intensityMapHR)
@@ -171,15 +167,18 @@ class Deblending:
         """
         regul = self.params.regul
         filt_w = self.params.filt_w
+        cubeLR = self.cube.data.filled(np.ma.median(self.cube.data))
+        cubeLRVar = self.cube.var.filled(np.ma.median(self.cube.var))
+
         if regul:
             # precompute continuum
-            self.cubeLR_c = median_filter(self.cubeLR, size=(filt_w, 1, 1),
-                                          mode='reflect')
+            cubeLR_c = median_filter(cubeLR, size=(filt_w, 1, 1),
+                                     mode='reflect')
 
         # compute HST-MUSE transfer functions for all MUSE FSF fwhm considered
         self.listTransferKernel = self._generateHSTMUSE_transfer_PSF()
 
-        shapeLR = (self.nbSources, self.cubeLR.shape[0])
+        shapeLR = (self.nbSources, self.nlbda)
 
         # Lists of [HR band, Spectral band]
         nbImagesHR = len(self.listImagesHR)
@@ -210,7 +209,7 @@ class Deblending:
             tmp_sources.append(np.zeros(shapeLR))
             tmp_var.append(np.zeros(shapeLR))
 
-            delta = int(self.cubeLR.shape[0] / float(self.nBands))
+            delta = int(self.nlbda / float(self.nBands))
 
             for i in range(self.nBands):
                 imin, imax = i * delta, (i + 1) * delta
@@ -242,10 +241,10 @@ class Deblending:
                     # Yvar : n x lmbda
 
                     U = intensityMapLRConvol.T
-                    Y = self.cubeLR[imin:imax].reshape(delta, -1).T
+                    Y = cubeLR[imin:imax].reshape(delta, -1).T
                     if regul:
-                        Y_c = self.cubeLR_c[imin:imax].reshape(delta, -1).T
-                    Yvar = self.cubeLRVar[imin:imax].reshape(delta, -1).T
+                        Y_c = cubeLR_c[imin:imax].reshape(delta, -1).T
+                    Yvar = cubeLRVar[imin:imax].reshape(delta, -1).T
 
                     # normalize intensity maps in flux to get flux-calibrated
                     # estimated spectra
@@ -305,7 +304,7 @@ class Deblending:
                         (self.nbSources, self.shapeLR[0] * self.shapeLR[1]))
 
         self._combineSpectra(tmp_sources, tmp_var)
-        self.estimatedCube.data = self._rebuildCube(tmp_sources)
+        self._rebuildCube(tmp_sources)
         self._getContinuumCube(tmp_sources)
         self._getResiduals()
 
@@ -349,8 +348,8 @@ class Deblending:
                                  axis=0) / weigthTot
 
         # for background, get voxel mean instead of sum
-        self.sources[0] /= self.cubeLR.size
-        self.varSources[0] /= self.cubeLR.size
+        self.sources[0] /= self.cube.data.size
+        self.varSources[0] /= self.cube.data.size
 
     def _rebuildCube(self, tmp_sources):
         """Create the estimated cube.
@@ -359,8 +358,8 @@ class Deblending:
         distribution is different on each bin.
 
         """
-        estimatedCube = np.zeros((self.cubeLR.shape[0], np.prod(self.shapeLR)))
-        delta = int(self.cubeLR.shape[0] / float(self.nBands))
+        estimatedCube = np.zeros((self.nlbda, np.prod(self.shapeLR)))
+        delta = int(self.nlbda / float(self.nBands))
         filtResp = np.array(self.filtResp)
         weigthTot = np.ma.masked_values(filtResp.sum(axis=0), 0)
         filtResp /= weigthTot
@@ -377,11 +376,11 @@ class Deblending:
 
             estimatedCube[imin:imax, :] = np.sum(estim, axis=0)
 
-        estimatedCube = estimatedCube.reshape(self.cubeLR.shape)
-        return estimatedCube
+        self.estimatedCube = self.cube.clone()
+        self.estimatedCube.data = estimatedCube.reshape(self.cube.shape)
 
     def _getResiduals(self):
-        self.residuals = self.cubeLR - self.estimatedCube.data
+        self.residuals = self.cube.data - self.estimatedCube.data
 
     def _getContinuumCube(self, tmp_sources, w=101):
         """
@@ -395,13 +394,13 @@ class Deblending:
 
     @property
     def Xi2_tot(self):
-        return (1 / (np.size(self.residuals) - 3) *
-                np.sum(self.residuals**2 / self.cubeLRVar))
+        return (1 / (self.residuals.size - 3) *
+                np.sum(self.residuals**2 / self.cube.var))
 
     def calcXi2_source(self, k):
         mask = self.listIntensityMapLRConvol[0][0][k].reshape(self.shapeLR) > 0
-        return (1 / (np.size(self.residuals[:, mask]) - 3) *
-                np.sum(self.residuals[:, mask]**2 / self.cubeLRVar[:, mask]))
+        return (1 / (self.residuals[:, mask].size - 3) *
+                np.sum(self.residuals[:, mask]**2 / self.cube.var[:, mask]))
 
     def calcCondNumber(self, listobj=None):
         """Compute condition number."""
