@@ -10,17 +10,12 @@ ODHIN |release| documentation
 Example
 =======
 
-An example notebook is in ``notebooks/Example Odhin v2.ipynb``.
+An example notebook is available: :doc:`Example.ipynb <Example>`.
 
 An example settings file is given :doc:`here <settings>`.
 
-Binder
-------
-
-Test notebook inside a binder environment.
-
 .. image:: https://mybinder.org/badge_logo.svg
- :target: https://mybinder.org/v2/gh/raphbacher/odhin/master?filepath=notebooks/Example%20Odhin.ipynb
+ :target: https://mybinder.org/v2/gh/raphbacher/odhin/master?filepath=docs/Example.ipynb
 
 Contents
 ========
@@ -30,6 +25,7 @@ Contents
 
    installation
    settings
+   Example
    api
    changelog
 

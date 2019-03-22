@@ -35,6 +35,7 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
     'numpydoc',
+    'nbsphinx',
     'sphinx_automodapi.automodapi',
     'sphinx_automodapi.smart_resolver',
 ]
