@@ -7,8 +7,9 @@ Created on Thu Jun 30 07:59:14 2016
 
 
 def _setup_logging():
+    import sys
     from mpdaf.log import setup_logging, clear_loggers
-    setup_logging(name='', level='INFO', color=True,
+    setup_logging(name='', level='INFO', color=True, stream=sys.stdout,
                   fmt='%(levelname)s %(message)s')
     clear_loggers('mpdaf')
 
