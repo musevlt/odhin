@@ -30,7 +30,7 @@ def _worker_deblend(group, outfile, conf):
         deblendGroup(group, outfile, conf)
     except Exception:
         logger = logging.getLogger(__name__)
-        logger.error('group %d, failed', group.GID, exc_info=True)
+        logger.error('group %d, failed', group.ID, exc_info=True)
 
 
 class ODHIN:
@@ -119,13 +119,13 @@ class ODHIN:
             self.imHST, self.segmap, self.imMUSE, self.cat,
             kernel_transfert, params=self.params, verbose=verbose)
 
-        names = ('G_ID', 'nbSources', 'listIDs', 'Area')
-        groups = [[group.GID, group.nbSources, tuple(group.listSources),
+        names = ('group_id', 'nb_sources', 'list_ids', 'area')
+        groups = [[group.ID, group.nbSources, tuple(group.listSources),
                    group.region.area]
                   for i, group in enumerate(self.groups)]
         self.table_groups = Table(names=names, rows=groups,
                                   dtype=(int, int, tuple, float))
-        self.table_groups.add_index('G_ID')
+        self.table_groups.add_index('group_id')
 
     def deblend(self, listGroupToDeblend=None, njobs=None, verbose=True):
         """Parallelized deblending on a list of groups
@@ -156,12 +156,12 @@ class ODHIN:
             group = self.groups[i]
             if len(group.listSources) == 1:
                 self.logger.warning('skipping group %d, no sources in group',
-                                    group.GID)
+                                    group.ID)
                 continue
 
-            self.logger.debug('deblending group %d', group.GID)
+            self.logger.debug('deblending group %d', group.ID)
             # args: subcube, subsegmap
-            outfile = str(self.output_dir / f'group_{group.GID:05d}.fits')
+            outfile = str(self.output_dir / f'group_{group.ID:05d}.fits')
             to_process.append((group, outfile, self.conf))
 
         # Determine the number of processes:
@@ -209,8 +209,9 @@ class ODHIN:
         tables = vstack([Table.read(f, hdu='TAB_SOURCES')
                          for f in self.output_dir.glob('group_*.fits')])
         cat = Table([[str(x) for x in self.cat['ID']], self.cat['RA'],
-                     self.cat['DEC']], names=('ID', 'RA', 'DEC'))
-        self.table_sources = join(tables, cat, keys=['ID'], join_type='left')
+                     self.cat['DEC']], names=('id', 'ra', 'dec'))
+        self.table_sources = join(tables, cat, keys=['id'], join_type='left')
+        self.table_sources.sort('group_id')
         return self.table_sources
 
     def plotGroups(self, ax=None, groups=None, linewidth=1):
@@ -255,7 +256,7 @@ class ODHIN:
         reg = group.region
         subim = self.imMUSE[reg.sy, reg.sx]
         subim.plot(ax=ax)
-        ax.contour(self.imLabel[reg.sy, reg.sx] == group.GID + 1,
+        ax.contour(self.imLabel[reg.sy, reg.sx] == group.ID + 1,
                    levels=1, colors='r')
 
         src = group.listSources.copy()

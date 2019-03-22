@@ -26,15 +26,15 @@ __all__ = ('Deblending', 'deblendGroup')
 def deblendGroup(group, outfile, conf):
     """Deblend a given group."""
     logger = logging.getLogger(__name__)
-    logger.debug('group %d, start', group.GID)
+    logger.debug('group %d, start', group.ID)
     debl = Deblending(group, conf)
-    logger.debug('group %d, createIntensityMap', group.GID)
+    logger.debug('group %d, createIntensityMap', group.ID)
     debl.createIntensityMap()
-    logger.debug('group %d, findSources', group.GID)
+    logger.debug('group %d, findSources', group.ID)
     debl.findSources()
-    logger.debug('group %d, write', group.GID)
+    logger.debug('group %d, write', group.ID)
     debl.write(outfile, conf)
-    logger.debug('group %d, done', group.GID)
+    logger.debug('group %d, done', group.ID)
 
 
 class Deblending:
@@ -414,11 +414,11 @@ class Deblending:
         group = self.group
         origin = ('Odhin', __version__, self.cube.filename,
                   self.cube.primary_header.get('CUBE_V', ''))
-        src = Source.from_data(group.GID, group.region.ra, group.region.dec,
+        src = Source.from_data(group.ID, group.region.ra, group.region.dec,
                                origin=origin)
 
         cond_number = self.calcCondNumber(group.idxSources)
-        src.header['GRP_ID'] = group.GID
+        src.header['GRP_ID'] = group.ID
         src.header['GRP_AREA'] = group.region.area
         src.header['GRP_NSRC'] = group.nbSources
         src.header['COND_NB'] = cond_number
@@ -432,22 +432,22 @@ class Deblending:
                 src.spectra[iden] = sp
 
         # build sources table
-        ids = [f'bg_{group.GID}' if id_ == 'bg' else id_
+        ids = [f'bg_{group.ID}' if id_ == 'bg' else id_
                for id_ in self.listHST_ID]
-        rows = [(ids[k], group.GID, self.calcXi2_source(k))
+        rows = [(ids[k], group.ID, self.calcXi2_source(k))
                 for k in group.idxSources]
-        t = Table(rows=rows, names=('ID', 'G_ID', 'Xi2'))
-        t['Group Area'] = group.region.area
-        t['Number Sources'] = group.nbSources
-        t['Condition Number'] = cond_number
-        t['Xi2 Group'] = self.Xi2_tot
+        t = Table(rows=rows, names=('id', 'group_id', 'xi2'))
+        t['group_area'] = group.region.area
+        t['nb_sources'] = group.nbSources
+        t['condition_number'] = cond_number
+        t['xi2_group'] = self.Xi2_tot
         src.tables['sources'] = t
 
         # save cubes
         src.cubes['MUSE'] = self.cube
         src.cubes['FITTED'] = self.estimatedCube
         src.images['MUSE_WHITE'] = self.cube.mean(axis=0)
-        src.cubes['FITTED'] = self.estimatedCube.mean(axis=0)
+        src.images['FITTED'] = self.estimatedCube.mean(axis=0)
 
         # save params
         src.header.add_comment('')

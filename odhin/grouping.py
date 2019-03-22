@@ -18,17 +18,17 @@ __all__ = ('SourceGroup', 'RegionAttr', 'doGrouping', 'getObjsInBlob')
 
 class SourceGroup:
 
-    __slots__ = ('GID', 'listSources', 'region', 'nbSources', 'idxSources')
+    __slots__ = ('ID', 'listSources', 'region', 'nbSources', 'idxSources')
 
-    def __init__(self, GID, listSources, idxSources, region):
-        self.GID = GID
+    def __init__(self, ID, listSources, idxSources, region):
+        self.ID = ID
         self.listSources = listSources
         self.idxSources = idxSources
         self.region = region  # RegionAttr region
         self.nbSources = len(listSources)
 
     def __repr__(self):
-        return f'<SourceGroup({self.GID}, {self.nbSources} sources)>'
+        return f'<SourceGroup({self.ID}, {self.nbSources} sources)>'
 
 
 class RegionAttr:
