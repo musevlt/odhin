@@ -28,7 +28,8 @@ class SourceGroup:
         self.nbSources = len(listSources)
 
     def __repr__(self):
-        return f'<SourceGroup({self.ID}, {self.nbSources} sources)>'
+        label = 'sources' if self.nbSources > 1 else 'source'
+        return f'<SourceGroup({self.ID}, {self.nbSources} {label})>'
 
 
 class RegionAttr:

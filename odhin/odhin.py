@@ -133,8 +133,9 @@ class ODHIN:
         Parameters
         ----------
         listGroupToDeblend : list
-            List of group indices to process. If not provided, all groups are
-            processed.
+            List of group IDs to process. If not provided, all groups are
+            processed, starting with the ones with the highest number of
+            sources.
         njobs : int
             Number of process to run in parallel.
         verbose : bool
@@ -147,7 +148,8 @@ class ODHIN:
 
         # if no special groups are listed, do on all groups
         if listGroupToDeblend is None:
-            listGroupToDeblend = range(len(self.groups))
+            sort_idx = self.table_groups.argsort('nb_sources')
+            listGroupToDeblend = self.table_groups[sort_idx[::-1]]
 
         self.output_dir.mkdir(exist_ok=True)
 
@@ -160,7 +162,6 @@ class ODHIN:
                 continue
 
             self.logger.debug('deblending group %d', group.ID)
-            # args: subcube, subsegmap
             outfile = str(self.output_dir / f'group_{group.ID:05d}.fits')
             to_process.append((group, outfile, self.conf))
 
