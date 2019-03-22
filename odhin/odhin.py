@@ -143,8 +143,8 @@ class ODHIN:
 
         """
         if self.groups is None:
-            raise ValueError("No groups were defined. Please call a grouping "
-                             "method before doing a deblend")
+            raise ValueError("No groups were defined. Please call the "
+                             ".grouping() method before doing a deblend")
 
         # if no special groups are listed, do on all groups
         if listGroupToDeblend is None:
@@ -161,7 +161,6 @@ class ODHIN:
                                     group.ID)
                 continue
 
-            self.logger.debug('deblending group %d', group.ID)
             outfile = str(self.output_dir / f'group_{group.ID:05d}.fits')
             to_process.append((group, outfile, self.conf))
 
@@ -187,8 +186,7 @@ class ODHIN:
                 def update(*a):
                     pbar.update()
             else:
-                def update(*a):
-                    pass
+                update = None
 
             for args in to_process:
                 pool.apply_async(_worker_deblend, args=args, callback=update)

@@ -26,7 +26,7 @@ __all__ = ('Deblending', 'deblendGroup')
 def deblendGroup(group, outfile, conf):
     """Deblend a given group."""
     logger = logging.getLogger(__name__)
-    logger.debug('group %d, start', group.ID)
+    logger.debug('group %d, start, %d sources', group.ID, group.nbSources)
     debl = Deblending(group, conf)
     logger.debug('group %d, createIntensityMap', group.ID)
     debl.createIntensityMap()
