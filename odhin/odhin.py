@@ -228,7 +228,7 @@ class ODHIN:
         import matplotlib.patches as mpatches
         ax = get_fig_ax(ax)
         cm = cmap(self.imLabel.max(), random_state=12345)
-        ax.imshow(self.imLabel, cmap=cm)
+        ax.imshow(self.imLabel, cmap=cm, origin='lower')
         if groups is None:
             groups = self.groups
         for group in groups:
