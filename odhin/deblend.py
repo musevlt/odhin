@@ -342,7 +342,7 @@ class Deblending:
     def _combineSpectra(self, tmp_sources, tmp_var):
         """Combine spectra estimated on each HST image."""
         filtResp = np.array(self.filtResp)
-        weigthTot = np.sum(filtResp, axis=0)
+        weigthTot = np.ma.masked_values(filtResp.sum(axis=0), 0)
         self.sources = np.sum(filtResp[:, None, :] * tmp_sources,
                               axis=0) / weigthTot
         self.varSources = np.sum(filtResp[:, None, :] * tmp_var,
@@ -353,14 +353,17 @@ class Deblending:
         self.varSources[0] /= self.cubeLR.size
 
     def _rebuildCube(self, tmp_sources):
-        """
-        Create estimated cube. We have to work on each MUSE spectral bin as
-        the spatial distribution is different on each bin
+        """Create the estimated cube.
+
+        We have to work on each MUSE spectral bin as the spatial
+        distribution is different on each bin.
+
         """
         estimatedCube = np.zeros((self.cubeLR.shape[0], np.prod(self.shapeLR)))
         delta = int(self.cubeLR.shape[0] / float(self.nBands))
         filtResp = np.array(self.filtResp)
-        filtResp /= filtResp.sum(axis=0)
+        weigthTot = np.ma.masked_values(filtResp.sum(axis=0), 0)
+        filtResp /= weigthTot
 
         for i in range(self.nBands):
             imin, imax = i * delta, (i + 1) * delta
