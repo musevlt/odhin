@@ -102,7 +102,7 @@ class Deblending:
 
         self.nBands = self.params.nBands
         # compute bands limit indices
-        idx = np.linspace(0, self.nlbda + 1, self.nBands + 1, dtype=int)
+        idx = np.linspace(0, self.nlbda, self.nBands + 1, dtype=int)
         self.idxBands = np.array([idx[:-1], idx[1:]]).T
 
         # compute FWHM at the center of bands
