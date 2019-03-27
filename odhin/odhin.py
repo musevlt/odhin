@@ -9,7 +9,7 @@ import pathlib
 import warnings
 
 from astropy.io import fits
-from astropy.table import Table, vstack, join
+from astropy.table import Table, vstack, join, Column
 from mpdaf import CPU
 from mpdaf.obj import Cube, Image
 from mpdaf.sdetect import Catalog
@@ -209,7 +209,12 @@ class ODHIN:
                          for f in self.output_dir.glob('group_*.fits')])
         cat = Table([[str(x) for x in self.cat['ID']], self.cat['RA'],
                      self.cat['DEC']], names=('id', 'ra', 'dec'))
-        self.table_sources = join(tables, cat, keys=['id'], join_type='left')
+        # join with input catalog (inner join to get only the processed ids,
+        # and without the bg_* rows)
+        self.table_sources = join(tables, cat, keys=['id'], join_type='inner')
+        # cast id column to integer
+        self.table_sources.replace_column('id', Column(
+            data=[int(x) for x in self.table_sources['id']]))
         self.table_sources.sort('group_id')
         return self.table_sources
 
