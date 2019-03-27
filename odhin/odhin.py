@@ -149,7 +149,7 @@ class ODHIN:
         # if no special groups are listed, do on all groups
         if listGroupToDeblend is None:
             sort_idx = self.table_groups.argsort('nb_sources')
-            listGroupToDeblend = self.table_groups[sort_idx[::-1]]
+            listGroupToDeblend = self.table_groups[sort_idx[::-1]]['group_id']
 
         self.output_dir.mkdir(exist_ok=True)
 
