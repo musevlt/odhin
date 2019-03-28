@@ -339,20 +339,18 @@ def check_segmap_catalog(segmap, cat):
 
 
 def extractHST(imHST, imMUSE, rot=True):
-    """
-    Extract HST image corresponding to MUSE image.
-    """
-    centerpix = (imMUSE.shape[0] // 2, imMUSE.shape[1] // 2)
+    """Extract HST image corresponding to MUSE image."""
+    centerpix = np.array(imMUSE.shape) / 2
     center = imMUSE.wcs.pix2sky(centerpix)[0]
     # size of MUSE image in arsec, (width, height)
     size = np.array(imMUSE.shape[::-1]) * imMUSE.get_step(unit=u.arcsec)
-    ext_size = size + 10  # with 10" margin
 
     if rot is True:
         pa_muse = imMUSE.get_rot()
         pa_hst = imHST.get_rot()
         if np.abs(pa_muse - pa_hst) > 1.e-3:
+            ext_size = size + 10  # with 10" margin
             imHST_tmp = imHST.subimage(center, ext_size, minsize=0)
-            imHST = imHST_tmp.rotate(imMUSE.get_rot())
+            imHST = imHST_tmp.rotate(pa_muse)
 
     return imHST.subimage(center, size, minsize=0)

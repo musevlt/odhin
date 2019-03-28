@@ -79,6 +79,10 @@ class Deblending:
 
         self.segmap = extractHST(Image(conf['segmap']), im).data.filled(0)
 
+        # List of all HST ids in the segmap
+        self.listHST_ID = self.group.listHST_ID
+        self.nbSources = len(self.listHST_ID)  # include background
+
         # spatial shapes
         self.nlbda = cube.shape[0]
         self.shapeLR = cube.shape[1:]
@@ -134,11 +138,6 @@ class Deblending:
         """Create intensity maps from HST images and segmentation map.
         To be called before calling findSources().
         """
-        # List of all HST ids in the segmap
-        hst_ids = np.unique(self.segmap)
-        self.listHST_ID = ['bg'] + sorted(hst_ids[hst_ids > 0])
-        self.nbSources = len(self.listHST_ID)  # include background
-
         # for each HST filter, create the high resolution intensity matrix
         # (nbSources x Nb pixels)
         self.listIntensityMapHR = []  # [bands, array(sources, im.shape)]
@@ -421,9 +420,9 @@ class Deblending:
         src.header['COND_NB'] = cond_number
         src.header['XI2_TOT'] = self.Xi2_tot
 
-        # add spectra, but remove spectra from objects not in the blob
+        # add spectra from objects in the blob
         for k, iden in enumerate(self.listHST_ID):
-            if iden == 'bg' or iden in group.listSources:
+            if iden in group.listSources:
                 sp = Spectrum(data=self.sources[k], var=self.varSources[k],
                               wave=self.cube.wave, copy=False)
                 src.spectra[iden] = sp

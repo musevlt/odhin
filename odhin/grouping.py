@@ -11,19 +11,21 @@ import logging
 import numpy as np
 from skimage.measure import regionprops, label
 
-from .utils import createIntensityMap, ProgressBar
+from .utils import createIntensityMap, ProgressBar, extractHST
 
 __all__ = ('SourceGroup', 'RegionAttr', 'doGrouping', 'getObjsInBlob')
 
 
 class SourceGroup:
 
-    __slots__ = ('ID', 'listSources', 'region', 'nbSources', 'idxSources')
+    __slots__ = ('ID', 'listSources', 'region', 'nbSources', 'idxSources',
+                 'listHST_ID')
 
-    def __init__(self, ID, listSources, idxSources, region):
+    def __init__(self, ID, listSources, idxSources, listHST_ID, region):
         self.ID = ID
         self.listSources = listSources
         self.idxSources = idxSources
+        self.listHST_ID = listHST_ID
         self.region = region  # RegionAttr region
         self.nbSources = len(listSources)
 
@@ -90,14 +92,6 @@ class RegionAttr:
                             int(min(self.centroid[1] + half_width, nx)))
             nb_pixels = np.sum(imLabel[self.sy, self.sx] == 0)
 
-    def convertToHR(self, imHR, imLR):
-        """Convert the bounding box from low resolution (MUSE) to
-        high resolution (HST).
-        """
-        pos = np.array([[self.sy.start, self.sx.start],
-                        [self.sy.stop, self.sx.stop]])
-        return imHR.wcs.sky2pix(imLR.wcs.pix2sky(pos), nearest=True).flatten()
-
 
 def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
                verbose=True):
@@ -120,20 +114,21 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
         region.compute_sky_centroid(imMUSE.wcs)
         region.ensureMinimalBbox(params.min_width, imLabel,
                                  params.min_sky_pixels, params.margin_bbox)
-        bboxHR = region.convertToHR(segmap, imMUSE)
-        subsegmap = segmap.data[bboxHR[0]:bboxHR[2], bboxHR[1]:bboxHR[3]]
         blob_mask = (imLabel == skreg.label)
         sub_blob_mask = blob_mask[region.sy, region.sx]
         subimMUSE = imMUSE[region.sy, region.sx]
-        idx, sources = getObjsInBlob('ID', cat, sub_blob_mask, subimMUSE,
-                                     subsegmap)
+        subsegmap = extractHST(segmap, subimMUSE).data
+
+        idx, sources, hstids = getObjsInBlob('ID', cat, sub_blob_mask,
+                                             subimMUSE, subsegmap)
         if len(sources) == 1:
             # FIXME: this should not happen. It seems to happen when a source
             # is close to an edge, and because the HR to LR resampling remove
             # the source flux on the edge spaxels. Should investigate more!
             logger.warning('found no sources in group %d', skreg.label - 1)
 
-        groups.append(SourceGroup(skreg.label - 1, sources, idx, region))
+        groups.append(SourceGroup(skreg.label - 1, sources, idx, hstids,
+                                  region))
 
     return groups, imLabel
 
@@ -161,4 +156,5 @@ def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, subsegmap):
 
     listObjInBlob = [0] + list(np.where(idx)[0] + 1)
     listHSTObjInBlob = ['bg'] + list(listHST_ID[idx])
-    return listObjInBlob, listHSTObjInBlob
+    listHST_ID = ['bg'] + list(listHST_ID)
+    return listObjInBlob, listHSTObjInBlob, listHST_ID
