@@ -117,7 +117,7 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
         blob_mask = (imLabel == skreg.label)
         sub_blob_mask = blob_mask[region.sy, region.sx]
         subimMUSE = imMUSE[region.sy, region.sx]
-        subsegmap = extractHST(segmap, subimMUSE).data
+        subsegmap = extractHST(segmap, subimMUSE, integer_mode=True).data
 
         idx, sources, hstids = getObjsInBlob('ID', cat, sub_blob_mask,
                                              subimMUSE, subsegmap)

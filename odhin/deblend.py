@@ -77,7 +77,8 @@ class Deblending:
         self.cube = cube = cube[:, group.region.sy, group.region.sx]
         im = cube[0]
 
-        self.segmap = extractHST(Image(conf['segmap']), im).data.filled(0)
+        self.segmap = (extractHST(Image(conf['segmap']), im, integer_mode=True)
+                       .data.filled(0))
 
         # List of all HST ids in the segmap
         self.listHST_ID = self.group.listHST_ID

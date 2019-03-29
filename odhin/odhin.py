@@ -71,7 +71,8 @@ class ODHIN:
             cube = Cube(self.conf['cube'])
             self.imMUSE = cube.sum(axis=0)
 
-        self.segmap = extractHST(Image(self.conf['segmap']), self.imMUSE)
+        self.segmap = extractHST(Image(self.conf['segmap']), self.imMUSE,
+                                 integer_mode=True)
 
         # catalog: check for potential discrepancy between the catalog and the
         # segmentation map (as in Rafelski15)
