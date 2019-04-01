@@ -324,7 +324,7 @@ class Deblending:
         asq_hst = self.params.fwhm_hst**2 / 4.0 / \
             (2.0**(1.0 / self.params.beta_hst) - 1.0)
         psf_hst = 1.0 / (1.0 + rsq / asq_hst)**self.params.beta_hst
-        psf_hst = psf_hst / np.sum(psf_hst)
+        psf_hst /= psf_hst.sum()
         # FIXME: use Moffat(rsq, asq_hst, self.params.beta_hst) ?
 
         listTransferKernel = []

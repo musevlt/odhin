@@ -241,10 +241,10 @@ def getBlurKernel(imHR, imLR, sizeKer, returnImBlurred=False, cut=0.00001):
         print(residuals, np.sum(imLR ** 2))
 
     kernel[kernel < cut] = 0.
-    if returnImBlurred is True:
+    if returnImBlurred:
         return kernel, imLRsynth
-
-    return kernel
+    else:
+        return kernel
 
 
 def calcMainKernelTransfert(params, imHST):
@@ -270,33 +270,36 @@ def calcMainKernelTransfert(params, imHST):
     # Build HST FSF
     asq_hst = fwhm_hst**2 / 4.0 / (2.0**(1.0 / beta_hst) - 1.0)
     psf_hst = 1.0 / (1.0 + rsq / asq_hst)**beta_hst
-    psf_hst = psf_hst / np.sum(psf_hst)
+    psf_hst /= psf_hst.sum()
 
     # Build MUSE FSF
     asq = fwhm_muse**2 / 4.0 / (2.0**(1.0 / fsf_beta_muse) - 1.0)
     im_muse = 1.0 / (1.0 + rsq / asq)**fsf_beta_muse
-    im_muse = im_muse / np.sum(im_muse)
+    im_muse /= im_muse.sum()
 
     return getBlurKernel(imHR=psf_hst, imLR=im_muse, sizeKer=(21, 21))
 
 
 def createIntensityMap(imHR, segmap, imLR, kernel_transfert, params):
-    """
-    Create intensity maps from HST images and segmentation map.
+    """Create intensity maps from HST images and segmentation map.
 
     Parameters
     ----------
-    imHR: the reference high resolution image
-    segmap : the segmantation map at high resolution
-    imLR : image at the targeted low resolution
-    kernel_transfert : convolution kernel from imHR to imLR
-    params : additionnal parameters
+    imHR :
+        the reference high resolution image
+    segmap :
+        the segmantation map at high resolution
+    imLR :
+        image at the targeted low resolution
+    kernel_transfert :
+        convolution kernel from imHR to imLR
+    params :
+        additionnal parameters
 
     """
-    labelHR = segmap.data
     intensityMapHR = np.zeros(imHR.shape)
     # avoid negative abundances
-    sel = labelHR > 0
+    sel = segmap.data > 0
     intensityMapHR[sel] = np.maximum(imHR.data[sel], 10**(-9))
 
     intensityMapLRConvol = convertIntensityMap(
@@ -340,7 +343,7 @@ def check_segmap_catalog(segmap, cat):
 
 def extractHST(imHST, imMUSE, rot=True, integer_mode=False):
     """Extract HST image corresponding to MUSE image."""
-    centerpix = np.array(imMUSE.shape) / 2
+    centerpix = np.array(imMUSE.shape) / 2 - 0.5
     center = imMUSE.wcs.pix2sky(centerpix)[0]
     # size of MUSE image in arsec, (width, height)
     size = np.array(imMUSE.shape[::-1]) * imMUSE.get_step(unit=u.arcsec)
@@ -349,7 +352,7 @@ def extractHST(imHST, imMUSE, rot=True, integer_mode=False):
         pa_muse = imMUSE.get_rot()
         pa_hst = imHST.get_rot()
         if np.abs(pa_muse - pa_hst) > 1.e-3:
-            ext_size = size + 10  # with 10" margin
+            ext_size = size * 1.42
             imHST_tmp = imHST.subimage(center, ext_size, minsize=0)
 
             order = 0 if integer_mode else 1
