@@ -6,6 +6,7 @@ import logging
 import multiprocessing
 import numpy as np
 import pathlib
+import pickle
 import warnings
 
 from astropy.io import fits
@@ -93,6 +94,22 @@ class ODHIN:
         logger = logging.getLogger()
         logger.setLevel(level)
         logger.handlers[0].setLevel(level)
+
+    def dump(self, filename):
+        """Dump the ODHIN object to a pickle file."""
+        with open(filename, 'wb') as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(self, filename):
+        """Load an ODHIN object from a pickle file."""
+        with open(filename, 'rb') as f:
+            self = pickle.load(f)
+        # recreate the group_id index, otherwise it crashes with the default
+        # index implementation
+        self.table_groups.remove_indices('group_id')
+        self.table_groups.add_index('group_id')
+        return self
 
     def grouping(self, verbose=True, cut=None):
         """Segment all sources in a number of connected (at the MUSE
