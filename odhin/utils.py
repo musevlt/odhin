@@ -12,6 +12,7 @@ from photutils import create_matching_kernel, TopHatWindow
 from scipy import ndimage
 from scipy.interpolate import interp1d
 from scipy.signal import fftconvolve
+from skimage.measure import regionprops
 
 __all__ = ('generatePSF_HST', 'generateMoffatIm', 'extractHST')
 
@@ -328,8 +329,11 @@ def check_segmap_catalog(segmap, cat):
         logger.warning('found %d sources in segmap that are missing in the '
                        'catalog (ID: %s), adding them to the catalog',
                        missing.size, missing)
-        coords = [np.mean(np.where(segmap._data == iden), axis=1)
-                  for iden in ProgressBar(missing)]
+
+        regions = {reg.label: reg
+                   for reg in regionprops(segmap._data, cache=False)}
+        coords = [regions[i].centroid for i in missing]
+
         dec, ra = segmap.wcs.pix2sky(coords).T
         cat2 = Table([missing, ra, dec], names=('ID', 'RA', 'DEC'))
         cat2['MISSING_SOURCE'] = True
