@@ -328,11 +328,11 @@ def check_segmap_catalog(segmap, cat):
         logger.warning('found %d sources in segmap that are missing in the '
                        'catalog (ID: %s), adding them to the catalog',
                        missing.size, missing)
-        coords = []
-        for iden in missing:
-            center = np.mean(np.where(segmap.data.data == iden), axis=1)
-            coords.append(segmap.wcs.pix2sky(center)[0])
-        dec, ra = zip(*coords)
+        if missing.size > 15:
+            missing = ProgressBar(missing)
+        coords = [np.mean(np.where(segmap._data == iden), axis=1)
+                  for iden in missing]
+        dec, ra = segmap.wcs.pix2sky(coords).T
         cat2 = Table([missing, ra, dec], names=('ID', 'RA', 'DEC'))
         cat2['MISSING_SOURCE'] = True
         cat = vstack([cat, cat2])
@@ -352,11 +352,14 @@ def extractHST(imHST, imMUSE, rot=True, integer_mode=False):
         pa_muse = imMUSE.get_rot()
         pa_hst = imHST.get_rot()
         if np.abs(pa_muse - pa_hst) > 1.e-3:
-            ext_size = size * 1.42
+            # increase size of image extracted before the rotation: first make
+            # it square, and then make sure than the diagonal can be contained
+            # in the rotated image
+            ext_size = size.clip(min=size.max()) * 1.42
             imHST_tmp = imHST.subimage(center, ext_size, minsize=0)
 
             order = 0 if integer_mode else 1
-            imHST = imHST_tmp.rotate(pa_muse, order=order)
+            imHST = imHST_tmp.rotate(pa_muse - pa_hst, order=order)
             if integer_mode:
                 imHST._data = np.around(imHST._data).astype(int)
 

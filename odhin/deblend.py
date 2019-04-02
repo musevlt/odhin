@@ -153,8 +153,11 @@ class Deblending:
             intensityMapHR[0] = 1
 
             for k, hst_id in enumerate(self.listHST_ID[1:], start=1):
-                mask = np.where(self.segmap == hst_id, data, 0)
-                intensityMapHR[k] = mask.ravel()
+                mask = self.segmap == hst_id
+                if mask.sum() == 0:
+                    raise ValueError(f'could not find source {hst_id}')
+                arr = np.where(mask, data, 0)
+                intensityMapHR[k] = arr.ravel()
 
             self.listIntensityMapHR.append(intensityMapHR)
 

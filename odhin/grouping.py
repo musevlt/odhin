@@ -121,6 +121,7 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
 
         idx, sources, hstids = getObjsInBlob('ID', cat, sub_blob_mask,
                                              subimMUSE, subsegmap)
+
         if len(sources) == 1:
             # FIXME: this should not happen. It seems to happen when a source
             # is close to an edge, and because the HR to LR resampling remove
