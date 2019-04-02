@@ -328,10 +328,8 @@ def check_segmap_catalog(segmap, cat):
         logger.warning('found %d sources in segmap that are missing in the '
                        'catalog (ID: %s), adding them to the catalog',
                        missing.size, missing)
-        if missing.size > 15:
-            missing = ProgressBar(missing)
         coords = [np.mean(np.where(segmap._data == iden), axis=1)
-                  for iden in missing]
+                  for iden in ProgressBar(missing)]
         dec, ra = segmap.wcs.pix2sky(coords).T
         cat2 = Table([missing, ra, dec], names=('ID', 'RA', 'DEC'))
         cat2['MISSING_SOURCE'] = True
