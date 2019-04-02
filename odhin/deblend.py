@@ -81,7 +81,9 @@ class Deblending:
                        .data.filled(0))
 
         # List of all HST ids in the segmap
-        self.listHST_ID = self.group.listHST_ID
+        listHST_ID = np.unique(self.segmap)
+        listHST_ID = listHST_ID[listHST_ID > 0]
+        self.listHST_ID = ['bg'] + list(listHST_ID)
         self.nbSources = len(self.listHST_ID)  # include background
 
         # spatial shapes
@@ -154,8 +156,6 @@ class Deblending:
 
             for k, hst_id in enumerate(self.listHST_ID[1:], start=1):
                 mask = self.segmap == hst_id
-                if mask.sum() == 0:
-                    raise ValueError(f'could not find source {hst_id}')
                 arr = np.where(mask, data, 0)
                 intensityMapHR[k] = arr.ravel()
 
@@ -417,7 +417,9 @@ class Deblending:
         src = Source.from_data(group.ID, group.region.ra, group.region.dec,
                                origin=origin)
 
-        cond_number = self.calcCondNumber(group.idxSources)
+        idxSources = [k for k, iden in enumerate(self.listHST_ID)
+                      if iden in group.listSources]
+        cond_number = self.calcCondNumber(idxSources)
         src.header['GRP_ID'] = group.ID
         src.header['GRP_AREA'] = group.region.area
         src.header['GRP_NSRC'] = group.nbSources
@@ -435,7 +437,7 @@ class Deblending:
         ids = [f'bg_{group.ID}' if id_ == 'bg' else id_
                for id_ in self.listHST_ID]
         rows = [(ids[k], group.ID, self.calcXi2_source(k))
-                for k in group.idxSources]
+                for k in idxSources]
         t = Table(rows=rows, names=('id', 'group_id', 'xi2'))
         t['group_area'] = group.region.area
         t['nb_sources'] = group.nbSources

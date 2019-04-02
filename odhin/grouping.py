@@ -18,13 +18,11 @@ __all__ = ('SourceGroup', 'RegionAttr', 'doGrouping', 'getObjsInBlob')
 
 class SourceGroup:
 
-    __slots__ = ('ID', 'listSources', 'region', 'nbSources', 'idxSources',
-                 'listHST_ID')
+    __slots__ = ('ID', 'listSources', 'region', 'nbSources', 'listHST_ID')
 
-    def __init__(self, ID, listSources, idxSources, listHST_ID, region):
+    def __init__(self, ID, listSources, listHST_ID, region):
         self.ID = ID
         self.listSources = listSources
-        self.idxSources = idxSources
         self.listHST_ID = listHST_ID
         self.region = region  # RegionAttr region
         self.nbSources = len(listSources)
@@ -119,16 +117,16 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
         subimMUSE = imMUSE[region.sy, region.sx]
         subsegmap = extractHST(segmap, subimMUSE, integer_mode=True).data
 
-        idx, sources, hstids = getObjsInBlob('ID', cat, sub_blob_mask,
-                                             subimMUSE, subsegmap)
+        listSources, hstids = getObjsInBlob('ID', cat, sub_blob_mask,
+                                            subimMUSE, subsegmap)
 
-        if len(sources) == 1:
+        if len(listSources) == 1:
             # FIXME: this should not happen. It seems to happen when a source
             # is close to an edge, and because the HR to LR resampling remove
             # the source flux on the edge spaxels. Should investigate more!
             logger.warning('found no sources in group %d', skreg.label - 1)
 
-        groups.append(SourceGroup(skreg.label - 1, sources, idx, hstids,
+        groups.append(SourceGroup(skreg.label - 1, listSources, hstids,
                                   region))
 
     return groups, imLabel
@@ -139,12 +137,10 @@ def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, subsegmap):
 
     Returns
     -------
-    listObjInBlob :
-        list of simple indices (from 0 to nb of sources in bounding box)
-        of objects in the bounding box connected to the blob.
-    listObjInBlob :
-        list of catalog indices  of objects in the bounding box connected
-        to the blob.
+    listHSTObjInBlob : list of int
+        List of catalog IDs connected to the blob.
+    listHST_ID : list of int
+        List of all catalog IDs in the cutout.
 
     """
     listHST_ID = np.unique(subsegmap)
@@ -155,7 +151,7 @@ def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, subsegmap):
     centerMUSE = subimMUSE.wcs.sky2pix(center, nearest=True).T
     idx = sub_blob_mask[centerMUSE[0], centerMUSE[1]]
 
-    listObjInBlob = [0] + list(np.where(idx)[0] + 1)
+    # listObjInBlob = [0] + list(np.where(idx)[0] + 1)
     listHSTObjInBlob = ['bg'] + list(listHST_ID[idx])
     listHST_ID = ['bg'] + list(listHST_ID)
-    return listObjInBlob, listHSTObjInBlob, listHST_ID
+    return listHSTObjInBlob, listHST_ID
