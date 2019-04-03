@@ -224,18 +224,26 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None,
 
     Parameters
     ----------
-    X : regressors (intensityMaps, n x k)
-    Y : data (n x lmbda)
-    ng : size of spectral blocks
-    alphas : list of regul parameters to test
-    sig2 : variance of each wavelength slice
-    support : mask of samples (pixels) with enough signal, where the cross
-    validation will be applied
+    X : ndarray
+        regressors (intensityMaps, n x k)
+    Y : ndarray
+        data (n x lmbda)
+    ng : int
+        size of spectral blocks
+    alphas : list of float
+        list of regul parameters to test
+    sig2 : ndarray
+        variance of each wavelength slice
+    support : ndarray
+        mask of samples (pixels) with enough signal, where the cross
+        validation will be applied
 
     Returns
     -------
-    coeff : estimated coefficients (spectra k x lmbda)
-    intercepts : background (1 x lmbda)
+    coeff :
+        estimated coefficients (spectra k x lmbda)
+    intercepts :
+        background (1 x lmbda)
 
     """
     import sklearn.linear_model as sklm
@@ -247,28 +255,30 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None,
     listAlpha = np.zeros((Y.shape[1]))
     listRSS = []
 
-    X_centr = X - np.mean(X, axis=0)
-    Y_centr = Y - np.mean(Y, axis=0)
+    X_centr = X - X.mean(axis=0)
+    Y_centr = Y - Y.mean(axis=0)
 
     X_centr /= np.linalg.norm(X_centr, axis=0)
 
     for k in range(int(np.ceil(Y.shape[1] / ng))):
+        kind = slice(k * ng, (k + 1) * ng)
         # prefered method : gcv_spe
-        alpha, rss = gridge_gcv_spectral(
-            X_centr, Y_centr[:, k * ng:(k + 1) * ng], alphas=alphas,
-            Sig2=sig2[k * ng:(k + 1) * ng], support=support)
-        listAlpha[k * ng:(k + 1) * ng] = alpha
+        alpha, rss = gridge_gcv_spectral(X_centr, Y_centr[:, kind],
+                                         alphas=alphas, sig2=sig2[kind],
+                                         support=support)
+        listAlpha[kind] = alpha
         listRSS.append(rss.mean(axis=0).mean(axis=0))
+
         Ridge = sklm.Ridge(alpha=alpha, fit_intercept=True, normalize=True)
-        Ridge.fit(X, Y[:, k * ng:(k + 1) * ng])
-        coeff[:, k * ng:(k + 1) * ng] = Ridge.coef_.T
-        intercepts[:, k * ng:(k + 1) * ng] = Ridge.intercept_.T
+        Ridge.fit(X, Y[:, kind])
+        coeff[:, kind] = Ridge.coef_.T
+        intercepts[:, kind] = Ridge.intercept_.T
 
     return coeff, intercepts, listAlpha, listRSS
 
 
 def gridge_gcv_spectral(X, Y, support, alphas=np.logspace(-5, 2, 50),
-                        Sig2=None, maxAlphaFrac=2.):
+                        sig2=None, maxAlphaFrac=2.):
     """
     Estimate coefficients using ridge regression and various methods for
     regularization parameter estimation
@@ -284,7 +294,7 @@ def gridge_gcv_spectral(X, Y, support, alphas=np.logspace(-5, 2, 50),
         validation will be applied
     alphas : list of float
         list of regul parameters to test
-    Sig2 :
+    sig2 :
         variance of each wavelength slice (1d array n_targets)
     maxAlphaFrac : float
         fraction of the max singular value of X that will be the
@@ -298,11 +308,11 @@ def gridge_gcv_spectral(X, Y, support, alphas=np.logspace(-5, 2, 50),
     """
     Ys = Y[support]
     Xs = X[support]
-    if Sig2 is None:
-        Sig2 = np.ones(Y.shape[1])
+    if sig2 is None:
+        sig2 = np.ones(Y.shape[1])
 
     # FIXME: not used, remove ?
-    sumSig2 = Sig2[:-2] + Sig2[2:]
+    # sumSig2 = sig2[:-2] + sig2[2:]
     U, sval, V = np.linalg.svd(Xs, full_matrices=False)
     UtY = np.dot(U.T, Ys)
     UtY2 = UtY**2
@@ -316,15 +326,17 @@ def gridge_gcv_spectral(X, Y, support, alphas=np.logspace(-5, 2, 50),
 
         rss[:, a] = residuals / (1 - TrS / Xs.shape[0])**2
 
-    alpha = alphas[np.argmin(np.average(rss, axis=0, weights=1 / Sig2))]
+    alpha = alphas[np.argmin(np.average(rss, axis=0, weights=1 / sig2))]
     TrS = np.sum(sval**2 / (sval**2 + alpha))
     Xbeta = np.dot(U, _diag_dot(sval**2 / (sval**2 + alpha), UtY))
     rss_alpha = ((Ys - Xbeta) / (1 - TrS / Xs.shape[0]))**2
     cv = rss_alpha.shape[0] * rss_alpha.shape[1]
+
     min_mse_std = np.std(np.std(rss_alpha, axis=0), axis=0) / np.sqrt(cv)
     min_mse = np.mean(np.mean(rss_alpha, axis=0), axis=0)
     alpha = np.max([alphas[i] for i in range(len(alphas))
                     if np.mean(rss[:, i]) < min_mse + min_mse_std])
+
     if alpha > np.max(sval) * maxAlphaFrac:
         alpha = np.max(sval) * maxAlphaFrac
 
@@ -383,6 +395,7 @@ def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
         array of prediction errors
     listA : 2d array (k objects x lambda wavelengths)
          array of flux correction factors
+
     """
     # get emission lines only (Y_l)
     Y_l = Y - Y_c

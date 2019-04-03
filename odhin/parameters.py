@@ -22,7 +22,7 @@ DEFAULT_PARAMS = {
     'fsf_b_muse': -3.401e-05,
     # Beta parameter for MUSE FSF Moffat model
     'fsf_beta_muse': 2.8,
-    # mean wavelegnth to be used for grouping (where white MUSE image is used)
+    # mean wavelength to be used for grouping (where white MUSE image is used)
     'fsf_wavelength': 7000,
     # absolute cut value for convolution during grouping
     'cut': 0.005,
@@ -35,7 +35,7 @@ DEFAULT_PARAMS = {
     'filt_w': 101,
     # minimal width of a group bounding box
     'min_width': 6,
-    # additionnal margin in pixels around a ground bounding box
+    # additional margin in pixels around a ground bounding box
     'margin_bbox': 3,
     # minimal number of sky pixels in a bounding box to estimate correctly
     # the background

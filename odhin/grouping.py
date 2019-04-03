@@ -11,7 +11,7 @@ import logging
 import numpy as np
 from skimage.measure import regionprops, label
 
-from .utils import createIntensityMap, ProgressBar, extractHST
+from .utils import createIntensityMap, ProgressBar
 
 __all__ = ('SourceGroup', 'RegionAttr', 'doGrouping', 'getObjsInBlob')
 

@@ -149,21 +149,24 @@ def convertIntensityMap(intensityMap, muse, hst, fwhm, beta, imPSFMUSE):
     Parameters
     ----------
     intensityMap : `ndarray`
-        The matrix of intensity maps (one row per object) at HST resolution
-    hst : `mpdaf.obj.Image`
-       The HST image to be resampled.
+        The matrix of intensity maps (one row per object) at HST resolution.
     muse : `mpdaf.obj.Image` of `mpdaf.obj.Cube`
        The MUSE image or cube to use as the template for the HST image.
+    hst : `mpdaf.obj.Image`
+       The HST image to be resampled.
     fwhm : `float`
-        fwhm of MUSE FSF
+        FWHM of MUSE FSF.
     beta : `float`
-        Moffat beta parameter of MUSE FSF
+        Moffat beta parameter of MUSE FSF.
+    imPSFMUSE : ndarray
+        Transfer kernel.
 
     Returns
     -------
     intensityMapMuse : `ndarray`
        The matrix of intensity maps (one row per object) at MUSE resolution
        (and convolved by MUSE FSF or HST-MUSE transfert function)
+
     """
     intensityMapMuse = np.zeros((intensityMap.shape[0], muse.data.size))
     hst_ref = hst.copy()
@@ -286,16 +289,16 @@ def createIntensityMap(imHR, segmap, imLR, kernel_transfert, params):
 
     Parameters
     ----------
-    imHR :
+    imHR : `mpdaf.obj.Image`
         the reference high resolution image
-    segmap :
-        the segmantation map at high resolution
-    imLR :
+    segmap : `mpdaf.obj.Image`
+        the segmentation map at high resolution
+    imLR : `mpdaf.obj.Image`
         image at the targeted low resolution
-    kernel_transfert :
+    kernel_transfert : ndarray
         convolution kernel from imHR to imLR
-    params :
-        additionnal parameters
+    params : `odhin.Params`
+        additional parameters
 
     """
     intensityMapHR = np.zeros(imHR.shape)
@@ -317,7 +320,7 @@ def check_segmap_catalog(segmap, cat):
     Avoid discrepancy between the catalog and the segmentation map
     (there are some segmap objects missing from the Rafelski 2015 catalog). If
     some sources are found in the segmap but are missing in the catalog, then
-    additionnal rows with new IDs are added to the catalog.
+    additional rows with new IDs are added to the catalog.
 
     """
     keys = np.unique(segmap.data.data)
