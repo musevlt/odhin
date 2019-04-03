@@ -90,6 +90,18 @@ class RegionAttr:
                             int(min(self.centroid[1] + half_width, nx)))
             nb_pixels = np.sum(imLabel[self.sy, self.sx] == 0)
 
+    def convertToHR(self, imHR, imLR):
+        """Convert the bounding box from low resolution (MUSE) to
+        high resolution (HST).
+        """
+        # compute coordinates of bottom left corners
+        pos = np.array([[self.sy.start, self.sx.start],
+                        [self.sy.stop, self.sx.stop]]) - 0.5
+        # get HR pixel indices
+        hrpix = imHR.wcs.sky2pix(imLR.wcs.pix2sky(pos), nearest=True)
+        sy, sx = (slice(*x) for x in hrpix.T)
+        return sy, sx
+
 
 def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
                verbose=True):
@@ -115,7 +127,8 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
         blob_mask = (imLabel == skreg.label)
         sub_blob_mask = blob_mask[region.sy, region.sx]
         subimMUSE = imMUSE[region.sy, region.sx]
-        subsegmap = extractHST(segmap, subimMUSE, integer_mode=True).data
+        hy, hx = region.convertToHR(segmap, imMUSE)
+        subsegmap = segmap.data[hy, hx]
 
         listSources, hstids = getObjsInBlob('ID', cat, sub_blob_mask,
                                             subimMUSE, subsegmap)
