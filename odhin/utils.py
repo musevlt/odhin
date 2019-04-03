@@ -310,6 +310,7 @@ def createIntensityMap(imHR, segmap, imLR, kernel_transfert, params):
         intensityMapHR[None, :], imLR, imHR, params.fwhm_muse,
         params.fsf_beta_muse, kernel_transfert
     ).reshape(imLR.shape)
+    intensityMapLRConvol[imLR.mask] = 0
 
     return intensityMapLRConvol
 
