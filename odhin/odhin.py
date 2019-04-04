@@ -197,7 +197,7 @@ class ODHIN:
         if cpu_count > 1:
             pool = multiprocessing.Pool(processes=cpu_count)
             if verbose:
-                ntasks = len(listGroupToDeblend)
+                ntasks = len(to_process)
                 # add progress bar
                 pbar = ProgressBar(total=ntasks)
 
