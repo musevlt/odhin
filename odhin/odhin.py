@@ -56,7 +56,8 @@ class ODHIN:
 
     """
 
-    def __init__(self, settings_file, output_dir):
+    def __init__(self, settings_file, output_dir, idname='ID', raname='RA',
+                 decname='DEC'):
         self.logger = logging.getLogger(__name__)
         self.logger.debug('loading settings from %s', settings_file)
         self.output_dir = pathlib.Path(output_dir)
@@ -77,9 +78,13 @@ class ODHIN:
 
         # catalog: check for potential discrepancy between the catalog and the
         # segmentation map (as in Rafelski15)
+        self.idname = idname
+        self.raname = raname
+        self.decname = decname
         self.cat = Catalog.read(self.conf['catalog'])
-        self.cat.add_index('ID')
-        self.cat = check_segmap_catalog(self.segmap, self.cat)
+        self.cat.add_index(idname)
+        self.cat = check_segmap_catalog(self.segmap, self.cat,
+                                        idname=self.idname)
 
         self.params = Params(**self.conf.get('params', {}))
 
@@ -225,8 +230,9 @@ class ODHIN:
         """
         tables = vstack([Table.read(f, hdu='TAB_SOURCES')
                          for f in self.output_dir.glob('group_*.fits')])
-        cat = Table([[str(x) for x in self.cat['ID']], self.cat['RA'],
-                     self.cat['DEC']], names=('id', 'ra', 'dec'))
+        cat = Table([[str(x) for x in self.cat[self.idname]],
+                     self.cat[self.raname], self.cat[self.decname]],
+                    names=('id', 'ra', 'dec'))
         # join with input catalog (inner join to get only the processed ids,
         # and without the bg_* rows)
         self.table_sources = join(tables, cat, keys=['id'], join_type='inner')
@@ -284,8 +290,9 @@ class ODHIN:
         src = group.listSources.copy()
         if 'bg' in src:
             src.remove('bg')
-        cat = self.cat[np.in1d(self.cat['ID'], src)]
-        y, x = subim.wcs.sky2pix(np.array([cat['DEC'], cat['RA']]).T).T
+        cat = self.cat[np.in1d(self.cat[self.idname], src)]
+        y, x = subim.wcs.sky2pix(
+            np.array([cat[self.decname], cat[self.raname]]).T).T
         ax.scatter(x, y, c="r")
 
     def plotHistArea(self, ax=None, nbins='auto'):

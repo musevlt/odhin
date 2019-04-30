@@ -315,7 +315,7 @@ def createIntensityMap(imHR, segmap, imLR, kernel_transfert, params):
     return intensityMapLRConvol
 
 
-def check_segmap_catalog(segmap, cat):
+def check_segmap_catalog(segmap, cat, idname='ID'):
     """Check that segmap and catalog are consistent and fix if needed.
 
     Avoid discrepancy between the catalog and the segmentation map
@@ -326,7 +326,7 @@ def check_segmap_catalog(segmap, cat):
     """
     keys = np.unique(segmap.data.data)
     keys = keys[keys > 0]
-    missing = keys[~np.in1d(keys, cat['ID'])]
+    missing = keys[~np.in1d(keys, cat[idname])]
 
     if missing.size > 0:
         logger = logging.getLogger(__name__)
@@ -342,7 +342,7 @@ def check_segmap_catalog(segmap, cat):
         cat2 = Table([missing, ra, dec], names=('ID', 'RA', 'DEC'))
         cat2['MISSING_SOURCE'] = True
         cat = vstack([cat, cat2])
-        cat.add_index('ID')
+        cat.add_index(idname)
 
     return cat
 
