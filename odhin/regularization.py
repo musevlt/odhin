@@ -5,6 +5,7 @@
 """
 
 import itertools
+
 import numpy as np
 
 from .lines_estimation import getLinesSupportList

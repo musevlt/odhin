@@ -1,9 +1,15 @@
-# -*- coding: utf-8 -*-
 """
 Created on Thu Jun 30 07:59:14 2016
 
 @author: raphael.bacher@gipsa-lab.fr
 """
+
+from .deblend import *
+from .grouping import *
+from .odhin import ODHIN
+from .parameters import *
+from .utils import *
+from .version import __version__
 
 
 def _setup_logging():
@@ -15,10 +21,3 @@ def _setup_logging():
 
 
 _setup_logging()
-
-from .deblend import *
-from .grouping import *
-from .odhin import ODHIN
-from .parameters import *
-from .utils import *
-from .version import __version__

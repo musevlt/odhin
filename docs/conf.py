@@ -5,6 +5,7 @@
 # http://www.sphinx-doc.org/en/master/config
 
 import os
+
 from pkg_resources import get_distribution
 
 # -- Project information -----------------------------------------------------

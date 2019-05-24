@@ -1,5 +1,6 @@
-from .grouping import doGrouping, convertBboxToHR
 from mpdaf.obj import Cube, Image
+
+from .grouping import convertBboxToHR, doGrouping
 
 imHST = Image("../data/hlsp_xdf_hst_acswfc-30mas_hudf_f775w_v1_sci.fits")
 imMUSE = Image("../data/IMAGE_UDF-10.fits")
@@ -16,8 +17,3 @@ def test_convertBboxToHR():
     bbox = [10,50,10,50]
     imHR.wcs.sky2pix(imLR.wcs.pix2sky([10,10]))
     # assert convertBboxToHR(bbox,imHR,imLR) == 
-    
-
-
-    
-    

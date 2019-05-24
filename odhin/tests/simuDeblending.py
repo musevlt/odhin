@@ -4,13 +4,16 @@
 """
 
 
+import os
+
 import numpy as np
 import scipy.signal as ssl
 from scipy.stats import multivariate_normal
-from .downsampling import downsampling
-from .deblend_utils import generateMoffatIm
-import os
+
 import astropy.io.fits as pyfits
+
+from .deblend_utils import generateMoffatIm
+from .downsampling import downsampling
 
 
 class SimuDeblending:

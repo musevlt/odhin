@@ -3,16 +3,17 @@
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-import astropy.units as u
 import logging
-import numpy as np
 
-from astropy.table import Table, vstack
-from photutils import create_matching_kernel, TopHatWindow
+import numpy as np
 from scipy import ndimage
 from scipy.interpolate import interp1d
 from scipy.signal import fftconvolve
 from skimage.measure import regionprops
+
+import astropy.units as u
+from astropy.table import Table, vstack
+from photutils import TopHatWindow, create_matching_kernel
 
 __all__ = ('generatePSF_HST', 'generateMoffatIm', 'extractHST')
 

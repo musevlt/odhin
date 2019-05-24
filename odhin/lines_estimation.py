@@ -1,8 +1,9 @@
 import numpy as np
 import scipy.stats as sst
-from astropy.stats import mad_std
 from scipy.ndimage.morphology import grey_dilation
 from scipy.signal import fftconvolve
+
+from astropy.stats import mad_std
 
 
 def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,

@@ -4,23 +4,30 @@
 
 import logging
 import multiprocessing
-import numpy as np
 import pathlib
 import pickle
 import warnings
 
+import numpy as np
+
 from astropy.io import fits
-from astropy.table import Table, vstack, join, Column
+from astropy.table import Column, Table, join, vstack
 from mpdaf import CPU
 from mpdaf.obj import Cube, Image
 from mpdaf.sdetect import Catalog
 from mpdaf.tools import MpdafUnitsWarning
 
 from .deblend import deblendGroup
-from .utils import (calcMainKernelTransfert, get_fig_ax, cmap,
-                    extractHST, check_segmap_catalog, ProgressBar)
 from .grouping import doGrouping
 from .parameters import Params, load_settings
+from .utils import (
+    ProgressBar,
+    calcMainKernelTransfert,
+    check_segmap_catalog,
+    cmap,
+    extractHST,
+    get_fig_ax,
+)
 
 # Ignore units warnings from MPDAF
 warnings.simplefilter('ignore', MpdafUnitsWarning)

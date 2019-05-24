@@ -3,21 +3,28 @@
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-import astropy.units as units
 import logging
+
 import numpy as np
 import scipy.signal as ssl
 import yaml
-
-from astropy.table import Table
-from mpdaf.obj import Spectrum, Image, Cube
-from mpdaf.sdetect import Source
 from scipy.ndimage import median_filter
 
-from .utils import (load_filter, convertIntensityMap, extractHST,
-                    getMainSupport, generatePSF_HST, getBlurKernel)
+import astropy.units as units
+from astropy.table import Table
+from mpdaf.obj import Cube, Image, Spectrum
+from mpdaf.sdetect import Source
+
 from .parameters import Params
 from .regularization import regulDeblendFunc
+from .utils import (
+    convertIntensityMap,
+    extractHST,
+    generatePSF_HST,
+    getBlurKernel,
+    getMainSupport,
+    load_filter,
+)
 from .version import __version__
 
 __all__ = ('Deblending', 'deblendGroup')

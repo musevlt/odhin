@@ -3,21 +3,22 @@
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-from mpdaf.obj import Cube, Image, Spectrum
+import os
+
+import numpy as np
+import scipy.optimize as so
 import scipy.signal as ssl
 import scipy.sparse.linalg as sla
-import numpy as np
 from scipy.interpolate import interp1d
-import scipy.optimize as so
-import os
-import astropy.units as units
-import astropy.io.fits as pyfits
-from .regularization import regulDeblendFunc, medfilt
-from .parameters import Params
-from skimage.measure import regionprops, label
+from skimage.measure import label, regionprops
 
+import astropy.io.fits as pyfits
+import astropy.units as units
 from deblend.deblend_utils import convertIntensityMap
-from mpdaf.obj import Cube, Image
+from mpdaf.obj import Cube, Image, Spectrum
+
+from .parameters import Params
+from .regularization import medfilt, regulDeblendFunc
 
 imHST = Image("../data/hlsp_xdf_hst_acswfc-30mas_hudf_f775w_v1_sci.fits")
 imMUSE = Image("../data/IMAGE_UDF-10.fits")

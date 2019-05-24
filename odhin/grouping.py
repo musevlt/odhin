@@ -8,10 +8,11 @@ Store methods for
 """
 
 import logging
-import numpy as np
-from skimage.measure import regionprops, label
 
-from .utils import createIntensityMap, ProgressBar
+import numpy as np
+from skimage.measure import label, regionprops
+
+from .utils import ProgressBar, createIntensityMap
 
 __all__ = ('SourceGroup', 'RegionAttr', 'doGrouping', 'getObjsInBlob')
 
