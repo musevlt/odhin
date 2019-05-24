@@ -15,13 +15,12 @@ from astropy.table import Column, Table, join, vstack
 from mpdaf import CPU
 from mpdaf.obj import Cube, Image
 from mpdaf.sdetect import Catalog
-from mpdaf.tools import MpdafUnitsWarning
+from mpdaf.tools import MpdafUnitsWarning, progressbar
 
 from .deblend import deblendGroup
 from .grouping import doGrouping
 from .parameters import Params, load_settings
 from .utils import (
-    ProgressBar,
     calcMainKernelTransfert,
     check_segmap_catalog,
     cmap,
@@ -211,7 +210,7 @@ class ODHIN:
             if verbose:
                 ntasks = len(to_process)
                 # add progress bar
-                pbar = ProgressBar(total=ntasks)
+                pbar = progressbar(total=ntasks)
 
                 def update(*a):
                     pbar.update()

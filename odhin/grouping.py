@@ -10,9 +10,10 @@ Store methods for
 import logging
 
 import numpy as np
+from mpdaf.tools import progressbar
 from skimage.measure import label, regionprops
 
-from .utils import ProgressBar, createIntensityMap
+from .utils import createIntensityMap
 
 __all__ = ('SourceGroup', 'RegionAttr', 'doGrouping', 'getObjsInBlob')
 
@@ -117,7 +118,7 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
     groups = []
     regions = regionprops(imLabel)
     if verbose:
-        regions = ProgressBar(regions)
+        regions = progressbar(regions)
 
     for skreg in regions:
         # Build a RegionAttr object from a skimage region
