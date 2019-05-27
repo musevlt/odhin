@@ -16,7 +16,7 @@ from skimage.measure import label, regionprops
 
 from .utils import createIntensityMap
 
-__all__ = ('SourceGroup', 'RegionAttr', 'doGrouping', 'getObjsInBlob')
+__all__ = ('SourceGroup', 'RegionAttr', 'doGrouping')
 
 
 class SourceGroup:
@@ -149,10 +149,18 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
             sub_blob_mask = blob_mask[region.sy, region.sx]
             subimMUSE = imMUSE[region.sy, region.sx]
             hy, hx = region.convertToHR(segmap, imMUSE)
-            subsegmap = segmap.data[hy, hx]
+            subsegmap = segmap._data[hy, hx]
+
+            listHST_ID = np.unique(subsegmap)
+            listHST_ID = listHST_ID[listHST_ID > 0]
+
+            if listHST_ID.size == 0:
+                # no HST IDs found in the segmap region, which can happen
+                # with false detections when the threshold is low.
+                continue
 
             listSources, hstids = getObjsInBlob(idname, cat, sub_blob_mask,
-                                                subimMUSE, subsegmap)
+                                                subimMUSE, listHST_ID)
 
             if len(listSources) == 1:
                 # FIXME: this should not happen. It seems to happen when
@@ -193,7 +201,7 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
     return groups, im_label_comb
 
 
-def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, subsegmap):
+def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, listHST_ID):
     """Return the index and IDs of sources in the blobs.
 
     Returns
@@ -204,9 +212,6 @@ def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, subsegmap):
         List of all catalog IDs in the cutout.
 
     """
-    listHST_ID = np.unique(subsegmap)
-    listHST_ID = listHST_ID[listHST_ID > 0]
-
     subcat = cat.loc[idname, listHST_ID]
     center = np.array([subcat['DEC'], subcat['RA']]).T
     centerMUSE = subimMUSE.wcs.sky2pix(center, nearest=True).T
