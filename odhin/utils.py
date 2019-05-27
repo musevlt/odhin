@@ -30,9 +30,12 @@ def cmap(max_label, background_color='#000000', random_state=None):
     photutils SegmentationImage.cmap.
     """
     from matplotlib import colors
-    from photutils.utils.colormaps import random_cmap
+    try:
+        from photutils.utils.colormaps import make_random_cmap
+    except ImportError:
+        from photutils.utils.colormaps import random_cmap as make_random_cmap
 
-    cmap = random_cmap(max_label + 1, random_state=random_state)
+    cmap = make_random_cmap(max_label + 1, random_state=random_state)
 
     if background_color is not None:
         cmap.colors[0] = colors.hex2color(background_color)
