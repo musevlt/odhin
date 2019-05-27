@@ -30,11 +30,11 @@ from .version import __version__
 __all__ = ('Deblending', 'deblendGroup')
 
 
-def deblendGroup(group, outfile, conf):
+def deblendGroup(group, outfile, conf, imLabel):
     """Deblend a given group."""
     logger = logging.getLogger(__name__)
     logger.debug('group %d, start, %d sources', group.ID, group.nbSources)
-    debl = Deblending(group, conf)
+    debl = Deblending(group, conf, imLabel)
     logger.debug('group %d, createIntensityMap', group.ID)
     debl.createIntensityMap()
     logger.debug('group %d, findSources', group.ID)
@@ -76,13 +76,15 @@ class Deblending:
 
     """
 
-    def __init__(self, group, conf):
+    def __init__(self, group, conf, imLabel):
         self.params = Params(**conf.get('params', {}))
         self.group = group
 
         cube = Cube(conf['cube'])
         self.cube = cube = cube[:, group.region.sy, group.region.sx]
         im = cube[0]
+        self.imLabel = Image(data=imLabel[group.region.sy, group.region.sx],
+                             wcs=im.wcs.copy(), copy=False)
 
         self.segmap = (extractHST(Image(conf['segmap']), im, integer_mode=True)
                        .data.filled(0))
@@ -452,11 +454,13 @@ class Deblending:
         t['xi2_group'] = self.Xi2_tot
         src.tables['sources'] = t
 
-        # save cubes
+        # save cubes and images
         src.cubes['MUSE'] = self.cube
         src.cubes['FITTED'] = self.estimatedCube
+
         src.images['MUSE_WHITE'] = self.cube.mean(axis=0)
         src.images['FITTED'] = self.estimatedCube.mean(axis=0)
+        src.images['LABEL'] = self.imLabel
 
         # save params
         src.header.add_comment('')

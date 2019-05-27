@@ -194,7 +194,7 @@ class ODHIN:
                 continue
 
             outfile = str(self.output_dir / f'group_{group.ID:05d}.fits')
-            to_process.append((group, outfile, self.conf))
+            to_process.append((group, outfile, self.conf, self.imLabel))
 
         # Determine the number of processes:
         # - default: all CPUs except one.
