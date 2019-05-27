@@ -169,16 +169,18 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
         ids_in_groups = set(
             int(i) for i in chain.from_iterable(listSources) if i != 'bg'
         )
-        area = np.array([grp.region.area for grp in groups])
+        area = [grp.region.area for grp in groups]
+        nbSources = [grp.nbSources for grp in groups]
 
         # find the IDs that are not in a group
         tbl = cat.select(imMUSE.wcs, margin=0)
         missing_ids = sorted(set(tbl[idname].tolist()) - ids_in_groups)
         logger.info(
-            'Step %d: %d groups, %d sources, %d missing sources, area min=%d max=%d',
+            'Step %d: %d groups, %d sources, %d missing sources',
             it + 1, len(groups), len(ids_in_groups), len(missing_ids),
-            area.min(), area.max()
         )
+        logger.info('Area: min=%d max=%d', min(area), max(area))
+        logger.info('Nb sources: min=%d max=%d', min(nbSources), max(nbSources))
 
         if it == 0:
             # mask the HR image for the next iteration
