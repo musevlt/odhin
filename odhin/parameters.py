@@ -25,7 +25,7 @@ DEFAULT_PARAMS = {
     # mean wavelength to be used for grouping (where white MUSE image is used)
     'fsf_wavelength': 7000,
     # absolute cut value for convolution during grouping
-    'cut': 0.005,
+    'cut': (0.005, 0.0005),
     # Get mask containing a fraction alpha_cut of total map intensity
     'alpha_cut': 0.999,
     # regularize deblending

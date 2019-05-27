@@ -130,7 +130,7 @@ class ODHIN:
         ----------
         verbose : bool
             If True, show a progress bar.
-        cut : float
+        cut : (float, float)
             Threshold on the convolved intensity map, to get the segmentation
             image.
 
@@ -146,14 +146,17 @@ class ODHIN:
 
         self.groups, self.imLabel = doGrouping(
             self.imHST, self.segmap, self.imMUSE, self.cat,
-            kernel_transfert, params=self.params, verbose=verbose)
+            kernel_transfert, self.params, idname=self.idname, verbose=verbose
+        )
 
-        names = ('group_id', 'nb_sources', 'list_ids', 'area')
-        groups = [[group.ID, group.nbSources, tuple(group.listSources),
-                   group.region.area]
-                  for i, group in enumerate(self.groups)]
-        self.table_groups = Table(names=names, rows=groups,
-                                  dtype=(int, int, tuple, float))
+        rows = [[group.ID, group.nbSources, tuple(group.listSources),
+                 group.region.area, group.step]
+                for i, group in enumerate(self.groups)]
+        self.table_groups = Table(
+            names=('group_id', 'nb_sources', 'list_ids', 'area', 'step'),
+            rows=rows,
+            dtype=(int, int, tuple, float, int)
+        )
         self.table_groups.add_index('group_id')
 
     def deblend(self, listGroupToDeblend=None, njobs=None, verbose=True):
@@ -184,7 +187,7 @@ class ODHIN:
 
         to_process = []
         for i in listGroupToDeblend:
-            group = self.groups[i]
+            group = self.groups[i - 1]
             if len(group.listSources) == 1:
                 self.logger.warning('skipping group %d, no sources in group',
                                     group.ID)
@@ -286,22 +289,20 @@ class ODHIN:
         """
         assert group_id is not None
         ax = get_fig_ax(ax)
-        group = self.groups[group_id]
+        group = self.groups[group_id - 1]
         reg = group.region
         subim = self.imMUSE[reg.sy, reg.sx]
         subim.plot(ax=ax)
-        ax.contour(self.imLabel[reg.sy, reg.sx] == group.ID + 1,
-                   levels=1, colors='r')
+        ax.contour(self.imLabel[reg.sy, reg.sx] == group.ID, levels=1, colors='r')
 
         src = group.listSources.copy()
         if 'bg' in src:
             src.remove('bg')
         cat = self.cat[np.in1d(self.cat[self.idname], src)]
-        y, x = subim.wcs.sky2pix(
-            np.array([cat[self.decname], cat[self.raname]]).T).T
+        y, x = subim.wcs.sky2pix(np.array([cat[self.decname], cat[self.raname]]).T).T
         ax.scatter(x, y, c="r")
 
-    def plotHistArea(self, ax=None, nbins='auto'):
+    def plotHistArea(self, ax=None, nbins=None):
         """Plot histogram of group areas.
 
         Parameters
@@ -313,9 +314,12 @@ class ODHIN:
 
         """
         ax = get_fig_ax(ax)
+        if nbins is None:
+            nbins = int(self.table_groups['area'].max()) // 50
         ax.hist([group.region.area for group in self.groups], bins=nbins)
+        ax.set_title('Histogram of group areas')
 
-    def plotHistNbS(self, ax=None, nbins='auto'):
+    def plotHistNbS(self, ax=None, nbins=None):
         """Plot histogram of the number of sources per group.
 
         Parameters
@@ -327,4 +331,7 @@ class ODHIN:
 
         """
         ax = get_fig_ax(ax)
+        if nbins is None:
+            nbins = self.table_groups['nb_sources'].max()
         ax.hist([group.nbSources for group in self.groups], bins=nbins)
+        ax.set_title('Histogram of sources number per group')

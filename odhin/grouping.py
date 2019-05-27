@@ -8,6 +8,7 @@ Store methods for
 """
 
 import logging
+from itertools import chain
 
 import numpy as np
 from mpdaf.tools import progressbar
@@ -20,12 +21,14 @@ __all__ = ('SourceGroup', 'RegionAttr', 'doGrouping', 'getObjsInBlob')
 
 class SourceGroup:
 
-    __slots__ = ('ID', 'listSources', 'region', 'nbSources', 'listHST_ID')
+    __slots__ = ('ID', 'listSources', 'listHST_ID', 'region', 'step',
+                 'nbSources')
 
-    def __init__(self, ID, listSources, listHST_ID, region):
+    def __init__(self, ID, listSources, listHST_ID, region, step):
         self.ID = ID
         self.listSources = listSources
         self.listHST_ID = listHST_ID
+        self.step = step
         self.region = region  # RegionAttr region
         self.nbSources = len(listSources)
 
@@ -105,46 +108,87 @@ class RegionAttr:
         return sy, sx
 
 
-def doGrouping(imHR, segmap, imMUSE, cat, kernel_transfert, params,
-               verbose=True):
-    """Segment all sources in a number of connected (at the MUSE resolution)
-    groups.
+def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=True):
+    """Compute groups of connected (at the MUSE resolution) sources.
+
+    The grouping is done in 2 steps, with 2 thresholds. The first one allows to
+    get the groups with bright sources, and the second is needed to get all
+    sources included faint ones.
+
     """
     logger = logging.getLogger(__name__)
-    intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE,
-                                              kernel_transfert, params)
 
-    imLabel = label(intensityMapLRConvol > params.cut)
+    if len(params.cut) != 2:
+        raise ValueError(f'the cut param must contain 2 values')
+
     groups = []
-    regions = regionprops(imLabel)
-    if verbose:
-        regions = progressbar(regions)
+    im_label_comb = np.zeros(imMUSE.shape, dtype=int)
 
-    for skreg in regions:
-        # Build a RegionAttr object from a skimage region
-        region = RegionAttr.from_skimage(skreg)
-        region.compute_sky_centroid(imMUSE.wcs)
-        region.ensureMinimalBbox(params.min_width, imLabel,
-                                 params.min_sky_pixels, params.margin_bbox)
-        blob_mask = (imLabel == skreg.label)
-        sub_blob_mask = blob_mask[region.sy, region.sx]
-        subimMUSE = imMUSE[region.sy, region.sx]
-        hy, hx = region.convertToHR(segmap, imMUSE)
-        subsegmap = segmap.data[hy, hx]
+    for it in range(2):
+        intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE, kernel, params)
+        im_label = label(intensityMapLRConvol > params.cut[it])
 
-        listSources, hstids = getObjsInBlob('ID', cat, sub_blob_mask,
-                                            subimMUSE, subsegmap)
+        # compute offset before adding the label image
+        offset_label = im_label_comb.max()
 
-        if len(listSources) == 1:
-            # FIXME: this should not happen. It seems to happen when a source
-            # is close to an edge, and because the HR to LR resampling remove
-            # the source flux on the edge spaxels. Should investigate more!
-            logger.warning('found no sources in group %d', skreg.label - 1)
+        # combine label images
+        im_label_comb += np.where(im_label > 0, im_label + offset_label, 0)
 
-        groups.append(SourceGroup(skreg.label - 1, listSources, hstids,
-                                  region))
+        regions = regionprops(im_label)
 
-    return groups, imLabel
+        if verbose:
+            regions = progressbar(regions)
+
+        for skreg in regions:
+            # Build a RegionAttr object from a skimage region
+            region = RegionAttr.from_skimage(skreg)
+            region.compute_sky_centroid(imMUSE.wcs)
+            region.ensureMinimalBbox(params.min_width, im_label,
+                                     params.min_sky_pixels, params.margin_bbox)
+            blob_mask = (im_label == skreg.label)
+            sub_blob_mask = blob_mask[region.sy, region.sx]
+            subimMUSE = imMUSE[region.sy, region.sx]
+            hy, hx = region.convertToHR(segmap, imMUSE)
+            subsegmap = segmap.data[hy, hx]
+
+            listSources, hstids = getObjsInBlob(idname, cat, sub_blob_mask,
+                                                subimMUSE, subsegmap)
+
+            if len(listSources) == 1:
+                # FIXME: this should not happen. It seems to happen when
+                # a source is close to an edge, and because the HR to LR
+                # resampling remove the source flux on the edge spaxels.
+                # Should investigate more!
+                logger.warning('found no sources in group %d', skreg.label)
+
+            gid = skreg.label + offset_label
+            groups.append(SourceGroup(gid, listSources, hstids, region, it + 1))
+
+        # build the list of all IDs that are included in a group
+        listSources = (grp.listSources for grp in groups)
+        ids_in_groups = set(
+            int(i) for i in chain.from_iterable(listSources) if i != 'bg'
+        )
+        area = np.array([grp.region.area for grp in groups])
+
+        # find the IDs that are not in a group
+        tbl = cat.select(imMUSE.wcs, margin=0)
+        missing_ids = sorted(set(tbl[idname].tolist()) - ids_in_groups)
+        logger.info(
+            'Step %d: %d groups, %d sources, %d missing sources, area min=%d max=%d',
+            it + 1, len(groups), len(ids_in_groups), len(missing_ids),
+            area.min(), area.max()
+        )
+
+        if it == 0:
+            # mask the HR image for the next iteration
+            missing_map = np.logical_or.reduce(
+                [segmap._data == i for i in missing_ids]
+            ).astype(int)
+
+            imHR = imHR * missing_map
+
+    return groups, im_label_comb
 
 
 def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, subsegmap):
