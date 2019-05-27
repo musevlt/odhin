@@ -170,7 +170,7 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
             int(i) for i in chain.from_iterable(listSources) if i != 'bg'
         )
         area = [grp.region.area for grp in groups]
-        nbSources = [grp.nbSources for grp in groups]
+        nbSources = [grp.nbSources - 1 for grp in groups]
 
         # find the IDs that are not in a group
         tbl = cat.select(imMUSE.wcs, margin=0)
