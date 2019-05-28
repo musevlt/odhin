@@ -125,11 +125,13 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
     im_label_comb = None
 
     for it in range(2):
-        logger.info('Create intensity map and compute label image')
+        logger.info('Create intensity map')
         intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE, kernel, params)
+
+        logger.info('Compute label image')
         im_label = label(intensityMapLRConvol > params.cut[it])
 
-        # combine label images
+        # combine label images from the two steps
         if it == 0:
             offset_label = 0
             im_label_comb = im_label
@@ -168,14 +170,15 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
             listSources, hstids = getObjsInBlob(idname, cat, sub_blob_mask,
                                                 subimMUSE, listHST_ID)
 
+            gid = skreg.label + offset_label
+
             if len(listSources) == 1:
                 # FIXME: this should not happen. It seems to happen when
                 # a source is close to an edge, and because the HR to LR
                 # resampling remove the source flux on the edge spaxels.
                 # Should investigate more!
-                logger.warning('found no sources in group %d', skreg.label)
+                logger.warning('found no sources in group %d', gid)
 
-            gid = skreg.label + offset_label
             groups.append(SourceGroup(gid, listSources, hstids, region, it + 1))
 
         # build the list of all IDs that are included in a group
@@ -197,7 +200,7 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
         logger.info('Nb sources: min=%d max=%d', min(nbSources), max(nbSources))
 
         if it == 0:
-            # mask the HR image for the next iteration
+            logging.info('Mask the HR image to keep only the missing sources')
             missing_map = np.logical_or.reduce(
                 [segmap._data == i for i in missing_ids]
             ).astype(int)
