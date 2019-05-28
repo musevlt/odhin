@@ -33,9 +33,9 @@ from .utils import (
 warnings.simplefilter('ignore', MpdafUnitsWarning)
 
 
-def _worker_deblend(group, outfile, conf):
+def _worker_deblend(group, outfile, conf, imLabel, timestamp):
     try:
-        deblendGroup(group, outfile, conf)
+        deblendGroup(group, outfile, conf, imLabel, timestamp)
     except Exception:
         logger = logging.getLogger(__name__)
         logger.error('group %d, failed', group.ID, exc_info=True)
