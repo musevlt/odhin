@@ -207,7 +207,7 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
 
             imHR = imHR * missing_map
 
-    return groups, im_label_comb
+    return groups, im_label_comb, missing_ids
 
 
 def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, listHST_ID):
