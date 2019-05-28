@@ -122,18 +122,24 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
         raise ValueError(f'the cut param must contain 2 values')
 
     groups = []
-    im_label_comb = np.zeros(imMUSE.shape, dtype=int)
+    im_label_comb = None
 
     for it in range(2):
+        logger.info('Create intensity map and compute label image')
         intensityMapLRConvol = createIntensityMap(imHR, segmap, imMUSE, kernel, params)
         im_label = label(intensityMapLRConvol > params.cut[it])
 
-        # compute offset before adding the label image
-        offset_label = im_label_comb.max()
-
         # combine label images
-        im_label_comb += np.where(im_label > 0, im_label + offset_label, 0)
+        if it == 0:
+            offset_label = 0
+            im_label_comb = im_label
+        else:
+            # compute offset before adding the label image
+            offset_label = im_label_comb.max()
 
+            im_label_comb += np.where(im_label > 0, im_label + offset_label, 0)
+
+        logger.info('Compute regions properties')
         regions = regionprops(im_label)
 
         if verbose:
@@ -181,7 +187,7 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
         nbSources = [grp.nbSources - 1 for grp in groups]
 
         # find the IDs that are not in a group
-        tbl = cat.select(imMUSE.wcs, margin=0)
+        tbl = cat.select(imMUSE.wcs, margin=0, mask=imMUSE.mask)
         missing_ids = sorted(set(tbl[idname].tolist()) - ids_in_groups)
         logger.info(
             'Step %d: %d groups, %d sources, %d missing sources',
