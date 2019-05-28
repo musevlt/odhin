@@ -240,13 +240,16 @@ class ODHIN:
         This is called at the end of the `~ODHIN.deblend` method.
 
         """
-        flist = list(self.output_dir.glob('group_*.fits'))
-        tables = vstack([Table.read(f, hdu='TAB_SOURCES') for f in flist])
+        tables = []
+        for f in self.output_dir.glob('group_*.fits'):
+            t = Table.read(f, hdu='TAB_SOURCES')
+            t['timestamp'] = fits.getval(f, 'ODH_TS')
+            tables.append(t)
 
+        tables = vstack(tables)
         cat = Table([[str(x) for x in self.cat[self.idname]],
                      self.cat[self.raname], self.cat[self.decname]],
                     names=('id', 'ra', 'dec'))
-        cat['timestamp'] = [fits.getval(f, 'ODH_TS') for f in flist]
 
         # join with input catalog (inner join to get only the processed ids,
         # and without the bg_* rows)
