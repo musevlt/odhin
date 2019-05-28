@@ -145,7 +145,7 @@ class ODHIN:
         else:
             kernel_transfert = calcMainKernelTransfert(self.params, self.imHST)
 
-        self.groups, self.imLabeli,self.missing_ids = doGrouping(
+        self.groups, self.imLabel, self.missing_ids = doGrouping(
             self.imHST, self.segmap, self.imMUSE, self.cat,
             kernel_transfert, self.params, idname=self.idname, verbose=verbose
         )
