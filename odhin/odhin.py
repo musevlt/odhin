@@ -7,6 +7,7 @@ import multiprocessing
 import pathlib
 import pickle
 import warnings
+from datetime import datetime
 
 import numpy as np
 
@@ -185,6 +186,8 @@ class ODHIN:
 
         self.output_dir.mkdir(exist_ok=True)
 
+        timestamp = datetime.now().isoformat()
+
         to_process = []
         for i in listGroupToDeblend:
             group = self.groups[i - 1]
@@ -194,7 +197,7 @@ class ODHIN:
                 continue
 
             outfile = str(self.output_dir / f'group_{group.ID:05d}.fits')
-            to_process.append((group, outfile, self.conf, self.imLabel))
+            to_process.append((group, outfile, self.conf, self.imLabel, timestamp))
 
         # Determine the number of processes:
         # - default: all CPUs except one.
@@ -237,17 +240,21 @@ class ODHIN:
         This is called at the end of the `~ODHIN.deblend` method.
 
         """
-        tables = vstack([Table.read(f, hdu='TAB_SOURCES')
-                         for f in self.output_dir.glob('group_*.fits')])
+        flist = list(self.output_dir.glob('group_*.fits'))
+        tables = vstack([Table.read(f, hdu='TAB_SOURCES') for f in flist])
+
         cat = Table([[str(x) for x in self.cat[self.idname]],
                      self.cat[self.raname], self.cat[self.decname]],
                     names=('id', 'ra', 'dec'))
+        cat['timestamp'] = [fits.getval(f, 'ODH_TS') for f in flist]
+
         # join with input catalog (inner join to get only the processed ids,
         # and without the bg_* rows)
         self.table_sources = join(tables, cat, keys=['id'], join_type='inner')
         # cast id column to integer
-        self.table_sources.replace_column('id', Column(
-            data=[int(x) for x in self.table_sources['id']]))
+        self.table_sources.replace_column(
+            'id', Column(data=[int(x) for x in self.table_sources['id']])
+        )
         self.table_sources.sort('group_id')
         return self.table_sources
 

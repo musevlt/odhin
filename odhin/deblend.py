@@ -30,7 +30,7 @@ from .version import __version__
 __all__ = ('Deblending', 'deblendGroup')
 
 
-def deblendGroup(group, outfile, conf, imLabel):
+def deblendGroup(group, outfile, conf, imLabel, timestamp):
     """Deblend a given group."""
     logger = logging.getLogger(__name__)
     logger.debug('group %d, start, %d sources', group.ID, group.nbSources)
@@ -40,7 +40,7 @@ def deblendGroup(group, outfile, conf, imLabel):
     logger.debug('group %d, findSources', group.ID)
     debl.findSources()
     logger.debug('group %d, write', group.ID)
-    debl.write(outfile, conf)
+    debl.write(outfile, conf, timestamp)
     logger.debug('group %d, done', group.ID)
 
 
@@ -419,7 +419,7 @@ class Deblending:
         mat /= mat.sum(axis=1)[:, None]
         return np.linalg.cond(mat)
 
-    def write(self, outfile, conf):
+    def write(self, outfile, conf, timestamp):
         group = self.group
         origin = ('Odhin', __version__, self.cube.filename,
                   self.cube.primary_header.get('CUBE_V', ''))
@@ -434,6 +434,10 @@ class Deblending:
         src.header['GRP_NSRC'] = group.nbSources
         src.header['COND_NB'] = cond_number
         src.header['XI2_TOT'] = self.Xi2_tot
+
+        # we add a timestamp which allows to control that the sources are
+        # consistent with a given catalog
+        src.header['ODH_TS'] = timestamp
 
         # add spectra from objects in the blob
         for k, iden in enumerate(self.listHST_ID):
