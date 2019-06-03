@@ -85,11 +85,11 @@ class ODHIN:
 
         # catalog: check for potential discrepancy between the catalog and the
         # segmentation map (as in Rafelski15)
-        self.idname = idname
-        self.raname = raname
-        self.decname = decname
         self.cat = Catalog.read(self.conf['catalog'])
         self.cat.add_index(idname)
+        self.cat.meta['idname'] = self.idname = idname
+        self.cat.meta['raname'] = self.raname = raname
+        self.cat.meta['decname'] = self.decname = decname
         self.cat = check_segmap_catalog(self.segmap, self.cat,
                                         idname=self.idname)
 
@@ -286,8 +286,8 @@ class ODHIN:
                                       linewidth=linewidth)
             ax.add_patch(rect)
 
-    def plotAGroup(self, ax=None, group_id=None):
-        """Plot a group, with sources positions and contour.
+    def plotAGroup(self, ax=None, group_id=None, cmap='Greys', **kwargs):
+        """Plot a group, with sources positions and contour of the label image.
 
         Parameters
         ----------
@@ -295,6 +295,10 @@ class ODHIN:
             Axis to use for the plot.
         group_id : int
             Group id.
+        cmap : str
+            Colormap for the image plot.
+        kwargs : dict
+            Passed to Image.plot.
 
         """
         assert group_id is not None
@@ -302,12 +306,13 @@ class ODHIN:
         group = self.groups[group_id - 1]
         reg = group.region
         subim = self.imMUSE[reg.sy, reg.sx]
-        subim.plot(ax=ax)
+        subim.plot(ax=ax, cmap='Greys', **kwargs)
         ax.contour(self.imLabel[reg.sy, reg.sx] == group.ID, levels=1, colors='r')
 
         src = group.listSources.copy()
         if 'bg' in src:
             src.remove('bg')
+        self.cat.plot_symb(ax, subim.wcs, label=True, esize=0.4)
         cat = self.cat[np.in1d(self.cat[self.idname], src)]
         y, x = subim.wcs.sky2pix(np.array([cat[self.decname], cat[self.raname]]).T).T
         ax.scatter(x, y, c="r")
