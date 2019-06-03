@@ -206,6 +206,8 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
             ).astype(int)
 
             imHR = imHR * missing_map
+            segmap = segmap.copy()
+            segmap._data *= missing_map
 
     return groups, im_label_comb, missing_ids
 
