@@ -191,9 +191,9 @@ def rescale_hst_like_muse(hst, muse, inplace=True):
            u.Unit("erg cm-2 s-1 Angstrom-1")).to(muse.unit)
 
     # Rescale the HST image to have the same units as the MUSE image.
-    hst.data *= cal
+    hst.data *= cal.value
     if hst.var is not None:
-        hst.var *= cal ** 2
+        hst.var *= cal.value ** 2
     hst.unit = muse.unit
 
     return hst

@@ -180,9 +180,20 @@ class ODHIN:
                              ".grouping() method before doing a deblend")
 
         # if no special groups are listed, do on all groups
+        klist = []
+        slist = []
         if listGroupToDeblend is None:
-            sort_idx = self.table_groups.argsort('nb_sources')
-            listGroupToDeblend = self.table_groups[sort_idx[::-1]]['group_id']
+            for k,group in enumerate(self.groups):
+                if len(group.listSources) == 1:
+                    self.logger.warning('skipping group %d, no sources in group',
+                                    group.ID)
+                    continue
+                klist.append(k)
+                slist.append(len(group.listSources))
+            klist = np.array(klist)
+            ksort = np.argsort(slist)[::-1]
+            klist = klist[ksort]
+            listGroupToDeblend = klist
 
         self.output_dir.mkdir(exist_ok=True)
 
@@ -190,7 +201,7 @@ class ODHIN:
 
         to_process = []
         for i in listGroupToDeblend:
-            group = self.groups[i - 1]
+            group = self.groups[i]
             if len(group.listSources) == 1:
                 self.logger.warning('skipping group %d, no sources in group',
                                     group.ID)
