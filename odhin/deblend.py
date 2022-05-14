@@ -25,7 +25,7 @@ from .utils import (
     getMainSupport,
     load_filter,
 )
-from .version import __version__
+from .version import version as __version__
 
 __all__ = ('Deblending', 'deblendGroup')
 
