@@ -1,1 +1,1 @@
-See documentation : http://urania1.univ-lyon1.fr/UDF/odhin/
+See documentation: https://odhin.readthedocs.io/en/latest/
