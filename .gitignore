@@ -12,4 +12,5 @@ build/
 dist/
 docs/_build/
 docs/api/
+odhin/version.py
 .ipynb_checkpoints/

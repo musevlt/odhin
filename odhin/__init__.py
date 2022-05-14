@@ -4,12 +4,12 @@ Created on Thu Jun 30 07:59:14 2016
 @author: raphael.bacher@gipsa-lab.fr
 """
 
-from .deblend import *
-from .grouping import *
-from .odhin import ODHIN
-from .parameters import *
-from .utils import *
-from .version import __version__
+from .deblend import *  # noqa
+from .grouping import *  # noqa
+from .odhin import ODHIN  # noqa
+from .parameters import *  # noqa
+from .utils import *  # noqa
+from .version import version as __version__  # noqa
 
 
 def _setup_logging():
