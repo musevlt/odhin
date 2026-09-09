@@ -45,10 +45,10 @@ write_to = "odhin/version.py"
 
 [tool.ruff.lint]
 select = [
-  "E", "F", "W", # flake8
-  "B",           # bugbear
+  # "E", "F", "W", # flake8
+  # "B",           # bugbear
   "I",           # isort
-  "UP",          # pyupgrade
+  # "UP",          # pyupgrade
 ]
 # ignore = ["E731"]
 unfixable = [

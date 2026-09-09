@@ -5,15 +5,14 @@
 
 import logging
 
+import astropy.units as units
 import numpy as np
 import scipy.signal as ssl
 import yaml
-from scipy.ndimage import median_filter
-
-import astropy.units as units
 from astropy.table import Table
 from mpdaf.obj import Cube, Image, Spectrum
 from mpdaf.sdetect import Source
+from scipy.ndimage import median_filter
 
 from .parameters import Params
 from .regularization import regulDeblendFunc

@@ -10,7 +10,6 @@ import warnings
 from datetime import datetime
 
 import numpy as np
-
 from astropy.io import fits
 from astropy.table import Column, Table, join, vstack
 from mpdaf import CPU

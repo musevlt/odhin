@@ -14,7 +14,8 @@ from .version import version as __version__  # noqa
 
 def _setup_logging():
     import sys
-    from mpdaf.log import setup_logging, clear_loggers
+
+    from mpdaf.log import clear_loggers, setup_logging
     setup_logging(name='', level='INFO', color=True, stream=sys.stdout,
                   fmt='%(levelname)s %(message)s')
     clear_loggers('astropy')

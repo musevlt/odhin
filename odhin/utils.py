@@ -4,14 +4,13 @@
 
 import logging
 
+import astropy.units as u
 import numpy as np
+from astropy.table import Table, vstack
 from scipy import ndimage
 from scipy.interpolate import interp1d
 from scipy.signal import fftconvolve
 from skimage.measure import regionprops
-
-import astropy.units as u
-from astropy.table import Table, vstack
 
 try:
     from photutils.psf_matching import TopHatWindow, create_matching_kernel

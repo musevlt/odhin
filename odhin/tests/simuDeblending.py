@@ -6,11 +6,10 @@
 
 import os
 
+import astropy.io.fits as pyfits
 import numpy as np
 import scipy.signal as ssl
 from scipy.stats import multivariate_normal
-
-import astropy.io.fits as pyfits
 
 from .deblend_utils import generateMoffatIm
 from .downsampling import downsampling

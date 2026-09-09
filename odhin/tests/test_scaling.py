@@ -5,17 +5,16 @@
 
 import os
 
+import astropy.io.fits as pyfits
+import astropy.units as units
 import numpy as np
 import scipy.optimize as so
 import scipy.signal as ssl
 import scipy.sparse.linalg as sla
-from scipy.interpolate import interp1d
-from skimage.measure import label, regionprops
-
-import astropy.io.fits as pyfits
-import astropy.units as units
 from deblend.deblend_utils import convertIntensityMap
 from mpdaf.obj import Cube, Image, Spectrum
+from scipy.interpolate import interp1d
+from skimage.measure import label, regionprops
 
 from .parameters import Params
 from .regularization import medfilt, regulDeblendFunc
