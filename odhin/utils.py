@@ -12,7 +12,12 @@ from skimage.measure import regionprops
 
 import astropy.units as u
 from astropy.table import Table, vstack
-from photutils.psf import TopHatWindow, create_matching_kernel
+
+try:
+    from photutils.psf_matching import TopHatWindow, create_matching_kernel
+except ImportError:
+    # deprecated in photutils 3.0
+    from photutils.psf import TopHatWindow, create_matching_kernel
 
 __all__ = ('generatePSF_HST', 'generateMoffatIm', 'extractHST')
 
