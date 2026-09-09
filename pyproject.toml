@@ -1,6 +1,59 @@
 [build-system]
-requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2", "wheel"]
+requires = [ "setuptools>=77.0.0", "setuptools_scm>=8.0.0" ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "odhin"
+description = "Source deblending for MUSE"
+readme = "README.rst"
+authors = [
+    {name = "Raphael Bacher"},
+]
+keywords = ["astronomy", "astrophysics", "science", "muse", "vlt"]
+# license = MIT License
+# license_file = LICENSE
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "astropy",
+    "matplotlib",
+    "mpdaf",
+    "numpy",
+    "photutils",
+    "scikit-image",
+    "scikit-learn",
+    "scipy",
+    "tqdm",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+docs = ["numpydoc", "sphinx_rtd_theme", "sphinx-automodapi", "nbsphinx"]
+
+[project.urls]
+documentation = "https://odhin.readthedocs.io"
+github = "https://github.com/musevlt/odhin"
 
 [tool.setuptools_scm]
 write_to = "odhin/version.py"
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W", # flake8
+  "B",           # bugbear
+  "I",           # isort
+  "UP",          # pyupgrade
+]
+# ignore = ["E731"]
+unfixable = [
+  "F841", # Removes unused variables
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["zap"]
