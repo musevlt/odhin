@@ -16,10 +16,16 @@ def _setup_logging():
     import sys
 
     from mpdaf.log import clear_loggers, setup_logging
-    setup_logging(name='', level='INFO', color=True, stream=sys.stdout,
-                  fmt='%(levelname)s %(message)s')
-    clear_loggers('astropy')
-    clear_loggers('mpdaf')
+
+    setup_logging(
+        name="",
+        level="INFO",
+        color=True,
+        stream=sys.stdout,
+        fmt="%(levelname)s %(message)s",
+    )
+    clear_loggers("astropy")
+    clear_loggers("mpdaf")
 
 
 _setup_logging()

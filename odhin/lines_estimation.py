@@ -5,9 +5,19 @@ from scipy.ndimage.morphology import grey_dilation
 from scipy.signal import fftconvolve
 
 
-def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
-                        n_sig=1.2, f=0.6, returnAll=False, filt=None,
-                        localConstraint=True):
+def getLinesSupportList(
+    listSpe,
+    w=2,
+    wmin=1,
+    wmax=20,
+    alpha=1.4,
+    beta=1.2,
+    n_sig=1.2,
+    f=0.6,
+    returnAll=False,
+    filt=None,
+    localConstraint=True,
+):
     """
     Get emission/absorption lines spectral support
 
@@ -50,8 +60,7 @@ def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
         filt /= np.linalg.norm(filt)
 
     # generate kernels for estimation of line width
-    listWidth = np.concatenate([np.array([0.1]),
-                                np.arange(1, 2 * wmax + 2, 2)])
+    listWidth = np.concatenate([np.array([0.1]), np.arange(1, 2 * wmax + 2, 2)])
     listKernel = genKernels(listWidth=listWidth, n=2 * wmax + 1, n_sig=n_sig)
 
     listMask = []
@@ -59,7 +68,7 @@ def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
         # compute standard deviation estimator from MAD
         sig = mad_std(spe)
         # matched filter using filt
-        spe_filt = fftconvolve(spe, filt, mode='same')
+        spe_filt = fftconvolve(spe, filt, mode="same")
         # compute standard deviation estimator of filtered data from MAD
         sig_filt = mad_std(spe_filt)
         lRejected = 0
@@ -76,43 +85,56 @@ def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
 
         for k, extrema in zip(listArgExtrema, listExtrema):
             if (np.abs(extrema) > alpha * sig_filt) and (
-                    (localConstraint is False) or np.all(
-                        spe[np.maximum(k - 1, 0):k + 2] > np.sign(spe[k]) * sig
-                    )):
+                (localConstraint is False)
+                or np.all(spe[np.maximum(k - 1, 0) : k + 2] > np.sign(spe[k]) * sig)
+            ):
                 mask = np.zeros_like(spe, dtype=bool)
                 kmin = np.maximum(k - wmax, 0)
 
                 # create sub spectrum of good size for width estimation
                 if k - wmax < 0:
-                    line = np.concatenate([np.zeros(wmax - k),
-                                           spe[kmin:k + wmax + 1]])
+                    line = np.concatenate(
+                        [np.zeros(wmax - k), spe[kmin : k + wmax + 1]]
+                    )
                 elif wmax + k + 1 > len(spe):
-                    line = np.concatenate([spe[kmin:k + wmax + 1],
-                                           np.zeros(k + wmax + 1 - len(spe))])
+                    line = np.concatenate(
+                        [spe[kmin : k + wmax + 1], np.zeros(k + wmax + 1 - len(spe))]
+                    )
                 else:
-                    line = spe[kmin:k + wmax + 1]
+                    line = spe[kmin : k + wmax + 1]
 
                 # width line estimation
                 line = line / np.linalg.norm(line)
-                width = calcWidth(line, listKernel=listKernel, n_sig=n_sig,
-                                  listWidth=listWidth)
+                width = calcWidth(
+                    line, listKernel=listKernel, n_sig=n_sig, listWidth=listWidth
+                )
                 width = int(width)
 
                 # keep only peaks larger than minimal width
                 if width >= 2 * wmin + 1:
-                    if len(np.nonzero(
-                            spe[np.maximum(k - width, 0):k] < beta * sig)[0]) > 0:
-                        a = (np.maximum(k - width, 1) +
-                             np.nonzero(
-                                 spe[np.maximum(k - width, 0):k] < beta * sig
-                             )[0][-1] - 1)
+                    if (
+                        len(
+                            np.nonzero(spe[np.maximum(k - width, 0) : k] < beta * sig)[
+                                0
+                            ]
+                        )
+                        > 0
+                    ):
+                        a = (
+                            np.maximum(k - width, 1)
+                            + np.nonzero(
+                                spe[np.maximum(k - width, 0) : k] < beta * sig
+                            )[0][-1]
+                            - 1
+                        )
                     else:
                         a = np.maximum(k - width, 0)
-                    if len(np.nonzero(
-                            spe[k:k + width + 1] < beta * sig)[0]) > 0:
-                        b = k + \
-                            np.nonzero(spe[k:k + width + 1] <
-                                       beta * sig)[0][0] + 2
+                    if len(np.nonzero(spe[k : k + width + 1] < beta * sig)[0]) > 0:
+                        b = (
+                            k
+                            + np.nonzero(spe[k : k + width + 1] < beta * sig)[0][0]
+                            + 2
+                        )
                     else:
                         b = k + width + 1
                 else:
@@ -128,8 +150,17 @@ def getLinesSupportList(listSpe, w=2, wmin=1, wmax=20, alpha=1.4, beta=1.2,
                 listMask.append(mask)
 
     if returnAll:
-        return (listMask, lRejected, len(listExtrema), nThresh, listExtrema,
-                listArgExtrema, spe_filt, sig_filt, sig)
+        return (
+            listMask,
+            lRejected,
+            len(listExtrema),
+            nThresh,
+            listExtrema,
+            listArgExtrema,
+            spe_filt,
+            sig_filt,
+            sig,
+        )
     else:
         return listMask
 
@@ -156,7 +187,7 @@ def genKernels(listWidth=np.arange(5, 42, 2), n=41, n_sig=2):
     listKernel = []
     x = np.linspace(-20, 20, n)
     for k in listWidth:
-        g = sst.norm.pdf(x, scale=k / (n_sig * 2.))
+        g = sst.norm.pdf(x, scale=k / (n_sig * 2.0))
         g /= np.linalg.norm(g)
         listKernel.append(g)
     return listKernel
@@ -188,7 +219,7 @@ def calcWidth(spe, listKernel=None, n_sig=1, listWidth=np.arange(5, 42, 2)):
         listKernel = []
         x = np.linspace(-20, 20, listWidth[-1])
         for k in listWidth:
-            g = sst.norm.pdf(x, scale=k / (n_sig * 2.))
+            g = sst.norm.pdf(x, scale=k / (n_sig * 2.0))
             listKernel.append(g / np.linalg.norm(g))
     listCorr = []
     for g in listKernel:

@@ -29,7 +29,7 @@ from .utils import (
 )
 
 # Ignore units warnings from MPDAF
-warnings.simplefilter('ignore', MpdafUnitsWarning)
+warnings.simplefilter("ignore", MpdafUnitsWarning)
 
 
 def _worker_deblend(group, outfile, conf, imLabel, timestamp):
@@ -37,7 +37,7 @@ def _worker_deblend(group, outfile, conf, imLabel, timestamp):
         deblendGroup(group, outfile, conf, imLabel, timestamp)
     except Exception:
         logger = logging.getLogger(__name__)
-        logger.error('group %d, failed', group.ID, exc_info=True)
+        logger.error("group %d, failed", group.ID, exc_info=True)
 
 
 class ODHIN:
@@ -62,10 +62,11 @@ class ODHIN:
 
     """
 
-    def __init__(self, settings_file, output_dir, idname='ID', raname='RA',
-                 decname='DEC'):
+    def __init__(
+        self, settings_file, output_dir, idname="ID", raname="RA", decname="DEC"
+    ):
         self.logger = logging.getLogger(__name__)
-        self.logger.debug('loading settings from %s', settings_file)
+        self.logger.debug("loading settings from %s", settings_file)
         self.output_dir = pathlib.Path(output_dir)
         self.groups = None
 
@@ -73,31 +74,31 @@ class ODHIN:
         self.conf = load_settings(settings_file)
 
         # if nothing provided take white image of the cube
-        if 'white' in self.conf:
-            self.imMUSE = Image(self.conf['white'])
+        if "white" in self.conf:
+            self.imMUSE = Image(self.conf["white"])
         else:
-            cube = Cube(self.conf['cube'])
+            cube = Cube(self.conf["cube"])
             self.imMUSE = cube.sum(axis=0)
 
-        self.segmap = extractHST(Image(self.conf['segmap']), self.imMUSE,
-                                 integer_mode=True)
+        self.segmap = extractHST(
+            Image(self.conf["segmap"]), self.imMUSE, integer_mode=True
+        )
 
         # catalog: check for potential discrepancy between the catalog and the
         # segmentation map (as in Rafelski15)
-        self.cat = Catalog.read(self.conf['catalog'])
+        self.cat = Catalog.read(self.conf["catalog"])
         self.cat.add_index(idname)
-        self.cat.meta['idname'] = self.idname = idname
-        self.cat.meta['raname'] = self.raname = raname
-        self.cat.meta['decname'] = self.decname = decname
-        self.cat = check_segmap_catalog(self.segmap, self.cat,
-                                        idname=self.idname)
+        self.cat.meta["idname"] = self.idname = idname
+        self.cat.meta["raname"] = self.raname = raname
+        self.cat.meta["decname"] = self.decname = decname
+        self.cat = check_segmap_catalog(self.segmap, self.cat, idname=self.idname)
 
-        self.params = Params(**self.conf.get('params', {}))
+        self.params = Params(**self.conf.get("params", {}))
 
         # Reference HR image
-        ref_info = self.conf['hr_bands'][self.conf['hr_ref_band']]
-        self.imHST = extractHST(Image(ref_info['file']), self.imMUSE)
-        self.imHST.primary_header['photflam'] = ref_info.get('photflam', 1)
+        ref_info = self.conf["hr_bands"][self.conf["hr_ref_band"]]
+        self.imHST = extractHST(Image(ref_info["file"]), self.imMUSE)
+        self.imHST.primary_header["photflam"] = ref_info.get("photflam", 1)
 
     @staticmethod
     def set_loglevel(level):
@@ -108,18 +109,18 @@ class ODHIN:
 
     def dump(self, filename):
         """Dump the ODHIN object to a pickle file."""
-        with open(filename, 'wb') as f:
+        with open(filename, "wb") as f:
             pickle.dump(self, f)
 
     @classmethod
     def load(self, filename):
         """Load an ODHIN object from a pickle file."""
-        with open(filename, 'rb') as f:
+        with open(filename, "rb") as f:
             self = pickle.load(f)
         # recreate the group_id index, otherwise it crashes with the default
         # index implementation
-        self.table_groups.remove_indices('group_id')
-        self.table_groups.add_index('group_id')
+        self.table_groups.remove_indices("group_id")
+        self.table_groups.add_index("group_id")
         return self
 
     def grouping(self, verbose=True, cut=None):
@@ -139,25 +140,38 @@ class ODHIN:
             self.params.cut = cut
 
         # if nothing provided build transfer kernel from default parameters
-        if 'kernel_transfert' in self.conf:
-            kernel_transfert = fits.getdata(self.conf['kernel_transfert'])
+        if "kernel_transfert" in self.conf:
+            kernel_transfert = fits.getdata(self.conf["kernel_transfert"])
         else:
             kernel_transfert = calcMainKernelTransfert(self.params, self.imHST)
 
         self.groups, self.imLabel, self.missing_ids = doGrouping(
-            self.imHST, self.segmap, self.imMUSE, self.cat,
-            kernel_transfert, self.params, idname=self.idname, verbose=verbose
+            self.imHST,
+            self.segmap,
+            self.imMUSE,
+            self.cat,
+            kernel_transfert,
+            self.params,
+            idname=self.idname,
+            verbose=verbose,
         )
 
-        rows = [[group.ID, group.nbSources, tuple(group.listSources),
-                 group.region.area, group.step]
-                for i, group in enumerate(self.groups)]
+        rows = [
+            [
+                group.ID,
+                group.nbSources,
+                tuple(group.listSources),
+                group.region.area,
+                group.step,
+            ]
+            for i, group in enumerate(self.groups)
+        ]
         self.table_groups = Table(
-            names=('group_id', 'nb_sources', 'list_ids', 'area', 'step'),
+            names=("group_id", "nb_sources", "list_ids", "area", "step"),
             rows=rows,
-            dtype=(int, int, tuple, float, int)
+            dtype=(int, int, tuple, float, int),
         )
-        self.table_groups.add_index('group_id')
+        self.table_groups.add_index("group_id")
 
     def deblend(self, listGroupToDeblend=None, njobs=None, verbose=True):
         """Parallelized deblending on a list of groups
@@ -175,17 +189,20 @@ class ODHIN:
 
         """
         if self.groups is None:
-            raise ValueError("No groups were defined. Please call the "
-                             ".grouping() method before doing a deblend")
+            raise ValueError(
+                "No groups were defined. Please call the "
+                ".grouping() method before doing a deblend"
+            )
 
         # if no special groups are listed, do on all groups
         klist = []
         slist = []
         if listGroupToDeblend is None:
-            for k,group in enumerate(self.groups):
+            for k, group in enumerate(self.groups):
                 if len(group.listSources) == 1:
-                    self.logger.warning('skipping group %d, no sources in group',
-                                    group.ID)
+                    self.logger.warning(
+                        "skipping group %d, no sources in group", group.ID
+                    )
                     continue
                 klist.append(k)
                 slist.append(len(group.listSources))
@@ -202,11 +219,10 @@ class ODHIN:
         for i in listGroupToDeblend:
             group = self.groups[i]
             if len(group.listSources) == 1:
-                self.logger.warning('skipping group %d, no sources in group',
-                                    group.ID)
+                self.logger.warning("skipping group %d, no sources in group", group.ID)
                 continue
 
-            outfile = str(self.output_dir / f'group_{group.ID:05d}.fits')
+            outfile = str(self.output_dir / f"group_{group.ID:05d}.fits")
             to_process.append((group, outfile, self.conf, self.imLabel, timestamp))
 
         # Determine the number of processes:
@@ -220,7 +236,7 @@ class ODHIN:
             cpu_count = njobs
 
         cpu_count = min(cpu_count, len(listGroupToDeblend))
-        self.logger.debug('using %d cpus', cpu_count)
+        self.logger.debug("using %d cpus", cpu_count)
         if cpu_count > 1:
             pool = multiprocessing.Pool(processes=cpu_count)
             if verbose:
@@ -251,24 +267,29 @@ class ODHIN:
 
         """
         tables = []
-        for f in self.output_dir.glob('group_*.fits'):
-            t = Table.read(f, hdu='TAB_SOURCES', unit_parse_strict="silent")
-            t['timestamp'] = fits.getval(f, 'ODH_TS')
+        for f in self.output_dir.glob("group_*.fits"):
+            t = Table.read(f, hdu="TAB_SOURCES", unit_parse_strict="silent")
+            t["timestamp"] = fits.getval(f, "ODH_TS")
             tables.append(t)
 
         tables = vstack(tables)
-        cat = Table([[str(x) for x in self.cat[self.idname]],
-                     self.cat[self.raname], self.cat[self.decname]],
-                    names=('id', 'ra', 'dec'))
+        cat = Table(
+            [
+                [str(x) for x in self.cat[self.idname]],
+                self.cat[self.raname],
+                self.cat[self.decname],
+            ],
+            names=("id", "ra", "dec"),
+        )
 
         # join with input catalog (inner join to get only the processed ids,
         # and without the bg_* rows)
-        self.table_sources = join(tables, cat, keys=['id'], join_type='inner')
+        self.table_sources = join(tables, cat, keys=["id"], join_type="inner")
         # cast id column to integer
         self.table_sources.replace_column(
-            'id', Column(data=[int(x) for x in self.table_sources['id']])
+            "id", Column(data=[int(x) for x in self.table_sources["id"]])
         )
-        self.table_sources.sort('group_id')
+        self.table_sources.sort("group_id")
         return self.table_sources
 
     def plotGroups(self, ax=None, groups=None, linewidth=1):
@@ -283,20 +304,26 @@ class ODHIN:
 
         """
         import matplotlib.patches as mpatches
+
         ax = get_fig_ax(ax)
         cm = cmap(self.imLabel.max(), random_state=12345)
-        ax.imshow(self.imLabel, cmap=cm, origin='lower')
+        ax.imshow(self.imLabel, cmap=cm, origin="lower")
         if groups is None:
             groups = self.groups
         for group in groups:
             minr, maxr = group.region.sy.start, group.region.sy.stop
             minc, maxc = group.region.sx.start, group.region.sx.stop
-            rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr,
-                                      fill=False, edgecolor='red',
-                                      linewidth=linewidth)
+            rect = mpatches.Rectangle(
+                (minc, minr),
+                maxc - minc,
+                maxr - minr,
+                fill=False,
+                edgecolor="red",
+                linewidth=linewidth,
+            )
             ax.add_patch(rect)
 
-    def plotAGroup(self, ax=None, group_id=None, cmap='Greys', **kwargs):
+    def plotAGroup(self, ax=None, group_id=None, cmap="Greys", **kwargs):
         """Plot a group, with sources positions and contour of the label image.
 
         Parameters
@@ -316,12 +343,12 @@ class ODHIN:
         group = self.groups[group_id - 1]
         reg = group.region
         subim = self.imMUSE[reg.sy, reg.sx]
-        subim.plot(ax=ax, cmap='Greys', **kwargs)
-        ax.contour(self.imLabel[reg.sy, reg.sx] == group.ID, levels=1, colors='r')
+        subim.plot(ax=ax, cmap="Greys", **kwargs)
+        ax.contour(self.imLabel[reg.sy, reg.sx] == group.ID, levels=1, colors="r")
 
         src = group.listSources.copy()
-        if 'bg' in src:
-            src.remove('bg')
+        if "bg" in src:
+            src.remove("bg")
         self.cat.plot_symb(ax, subim.wcs, label=True, esize=0.4)
         cat = self.cat[np.isin(self.cat[self.idname], src)]
         y, x = subim.wcs.sky2pix(np.array([cat[self.decname], cat[self.raname]]).T).T
@@ -340,9 +367,9 @@ class ODHIN:
         """
         ax = get_fig_ax(ax)
         if nbins is None:
-            nbins = int(self.table_groups['area'].max()) // 50
+            nbins = int(self.table_groups["area"].max()) // 50
         ax.hist([group.region.area for group in self.groups], bins=nbins)
-        ax.set_title('Histogram of group areas')
+        ax.set_title("Histogram of group areas")
 
     def plotHistNbS(self, ax=None, nbins=None):
         """Plot histogram of the number of sources per group.
@@ -357,6 +384,6 @@ class ODHIN:
         """
         ax = get_fig_ax(ax)
         if nbins is None:
-            nbins = self.table_groups['nb_sources'].max()
+            nbins = self.table_groups["nb_sources"].max()
         ax.hist([group.nbSources for group in self.groups], bins=nbins)
-        ax.set_title('Histogram of sources number per group')
+        ax.set_title("Histogram of sources number per group")

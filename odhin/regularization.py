@@ -11,8 +11,16 @@ import numpy as np
 from .lines_estimation import getLinesSupportList
 
 
-def glasso_bic(X, Y, ng=2, multivar=True, listMask=None, returnCriterion=False,
-               greedy=True, averaged=True):
+def glasso_bic(
+    X,
+    Y,
+    ng=2,
+    multivar=True,
+    listMask=None,
+    returnCriterion=False,
+    greedy=True,
+    averaged=True,
+):
     """
     If given listMask, on each mask do a BIC selection (cf lasso_bic)
 
@@ -43,16 +51,21 @@ def glasso_bic(X, Y, ng=2, multivar=True, listMask=None, returnCriterion=False,
 
     if listMask is None:
         for k in range(Y.shape[1]):
-            res = lasso_bic(X, Y[:, np.maximum(0, k - ng):k + ng + 1],
-                            multivar=multivar, averaged=averaged,
-                            greedy=greedy)
+            res = lasso_bic(
+                X,
+                Y[:, np.maximum(0, k - ng) : k + ng + 1],
+                multivar=multivar,
+                averaged=averaged,
+                greedy=greedy,
+            )
             coeff[:, k] = res[0][:, np.minimum(k, ng)]
             intercepts[:, k] = res[1][np.minimum(k, ng)]
             criterion.append(res[2])
     else:
         for mask in listMask:
-            res = lasso_bic(X, Y[:, mask], multivar=multivar,
-                            averaged=averaged, greedy=greedy)
+            res = lasso_bic(
+                X, Y[:, mask], multivar=multivar, averaged=averaged, greedy=greedy
+            )
             coeff[:, mask] = res[0]
             intercepts[:, mask] = res[1]
             criterion.append(res[2])
@@ -63,8 +76,7 @@ def glasso_bic(X, Y, ng=2, multivar=True, listMask=None, returnCriterion=False,
         return coeff, intercepts
 
 
-def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
-              returnAll=False):
+def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True, returnAll=False):
     r"""
     Estimate spectra from X, Y using BIC.
 
@@ -107,8 +119,7 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
         # compute all possible combinations of non-nul objects
         listComb = []
         for k in range(1, n_models + 1):
-            listComb += [i for i in itertools.combinations(
-                np.arange(n_models), k)]
+            listComb += [i for i in itertools.combinations(np.arange(n_models), k)]
     else:
         # add iteratively the regressor the most strongly correlated to the
         # data in the remaining regressors
@@ -123,8 +134,7 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
             lprod = [np.mean(np.dot(X[:, i], residuals)) for i in listModels]
             a = np.argmax(np.abs(lprod))
             a_m = listModels[a]
-            residuals = Y - \
-                (lprod[a] / np.linalg.norm(X[:, a_m]) * X[:, a_m])[:, None]
+            residuals = Y - (lprod[a] / np.linalg.norm(X[:, a_m]) * X[:, a_m])[:, None]
             listModels.pop(a)
             listComb.append(listComb[k - 1] + [a_m])
 
@@ -139,8 +149,7 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
     for ind in listComb:
         coef_path_.append(np.linalg.lstsq(X[:, ind], Y, rcond=None)[0])
         if returnAll:
-            coef_path_all.append(np.linalg.lstsq(X[:, ind], Y_all,
-                                                 rcond=None)[0])
+            coef_path_all.append(np.linalg.lstsq(X[:, ind], Y_all, rcond=None)[0])
 
     n_samples = X.shape[0]
     n_targets = Y.shape[1]
@@ -150,7 +159,7 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
     mean_squared_error = []
     for k in range(len(coef_path_)):
         R = Y - np.dot(X[:, listComb[k]], coef_path_[k])  # residuals
-        mean_squared_error.append(np.mean(R ** 2, axis=0))
+        mean_squared_error.append(np.mean(R**2, axis=0))
     mean_squared_error = np.array(mean_squared_error)
 
     # get the number of degrees of freedom
@@ -166,11 +175,11 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
         df[k] = df[k] + n_targets
 
     if multivar:
-        criterion_ = n_samples * \
-            np.sum(np.log(mean_squared_error), axis=1) + K * df
+        criterion_ = n_samples * np.sum(np.log(mean_squared_error), axis=1) + K * df
     else:
-        criterion_ = n_samples * n_targets * \
-            np.log(np.mean(mean_squared_error, axis=1)) + K * df
+        criterion_ = (
+            n_samples * n_targets * np.log(np.mean(mean_squared_error, axis=1)) + K * df
+        )
 
     n_best = np.argmin(criterion_)
 
@@ -183,12 +192,15 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
     r0 = r0 + n_targets * K
 
     if returnAll:
-        likelihood = np.concatenate([
-            np.array([n_samples * np.sum(np.log(np.mean(Y**2, axis=0)))]),
-            n_samples * np.sum(np.log(mean_squared_error), axis=1)])
-        penalty = np.concatenate([
-            np.array([r0 - n_samples * np.sum(np.log(np.mean(Y**2, axis=0)))]),
-            K * df])
+        likelihood = np.concatenate(
+            [
+                np.array([n_samples * np.sum(np.log(np.mean(Y**2, axis=0)))]),
+                n_samples * np.sum(np.log(mean_squared_error), axis=1),
+            ]
+        )
+        penalty = np.concatenate(
+            [np.array([r0 - n_samples * np.sum(np.log(np.mean(Y**2, axis=0)))]), K * df]
+        )
 
     if averaged:  # we now get back to the whole dataset
         Y = Y_all
@@ -202,7 +214,8 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
     if criterion_[n_best] < r0:  # if not, all regressors stay at 0
         if averaged:
             coeff[listComb[n_best], :] = np.linalg.lstsq(
-                X[:, listComb[n_best]], Y, rcond=None)[0]
+                X[:, listComb[n_best]], Y, rcond=None
+            )[0]
         else:
             coeff[listComb[n_best], :] = coef_path_[n_best]
 
@@ -213,8 +226,7 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
         return coeff, intercepts, np.concatenate([np.array([r0]), criterion_])
 
 
-def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None,
-              support=None):
+def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None, support=None):
     """
     Estimate coefficients using ridge regression and various methods for
     regularization parameter estimation.
@@ -248,6 +260,7 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None,
 
     """
     import sklearn.linear_model as sklm
+
     coeff = np.zeros((X.shape[1], Y.shape[1]))
     intercepts = np.zeros((1, Y.shape[1]))
     # FIXME: not used, remove ?
@@ -264,9 +277,9 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None,
     for k in range(int(np.ceil(Y.shape[1] / ng))):
         kind = slice(k * ng, (k + 1) * ng)
         # prefered method : gcv_spe
-        alpha, rss = gridge_gcv_spectral(X_centr, Y_centr[:, kind],
-                                         alphas=alphas, sig2=sig2[kind],
-                                         support=support)
+        alpha, rss = gridge_gcv_spectral(
+            X_centr, Y_centr[:, kind], alphas=alphas, sig2=sig2[kind], support=support
+        )
         listAlpha[kind] = alpha
         listRSS.append(rss.mean(axis=0).mean(axis=0))
 
@@ -294,8 +307,9 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None,
     return coeff, intercepts, listAlpha, listRSS
 
 
-def gridge_gcv_spectral(X, Y, support, alphas=np.logspace(-5, 2, 50),
-                        sig2=None, maxAlphaFrac=2.):
+def gridge_gcv_spectral(
+    X, Y, support, alphas=np.logspace(-5, 2, 50), sig2=None, maxAlphaFrac=2.0
+):
     """
     Estimate coefficients using ridge regression and various methods for
     regularization parameter estimation
@@ -338,21 +352,25 @@ def gridge_gcv_spectral(X, Y, support, alphas=np.logspace(-5, 2, 50),
     for a, alpha in enumerate(alphas):
         # GCV approx S_ii =Tr(S)/n
         TrS = np.sum(sval**2 / (sval**2 + alpha))
-        residuals = np.sum(((alpha / (sval**2 + alpha))**2)
-                           [:, None] * UtY2, axis=0)
+        residuals = np.sum(((alpha / (sval**2 + alpha)) ** 2)[:, None] * UtY2, axis=0)
 
-        rss[:, a] = residuals / (1 - TrS / Xs.shape[0])**2
+        rss[:, a] = residuals / (1 - TrS / Xs.shape[0]) ** 2
 
     alpha = alphas[np.argmin(np.average(rss, axis=0, weights=1 / sig2))]
     TrS = np.sum(sval**2 / (sval**2 + alpha))
     Xbeta = np.dot(U, _diag_dot(sval**2 / (sval**2 + alpha), UtY))
-    rss_alpha = ((Ys - Xbeta) / (1 - TrS / Xs.shape[0]))**2
+    rss_alpha = ((Ys - Xbeta) / (1 - TrS / Xs.shape[0])) ** 2
     cv = rss_alpha.shape[0] * rss_alpha.shape[1]
 
     min_mse_std = np.std(np.std(rss_alpha, axis=0), axis=0) / np.sqrt(cv)
     min_mse = np.mean(np.mean(rss_alpha, axis=0), axis=0)
-    alpha = np.max([alphas[i] for i in range(len(alphas))
-                    if np.mean(rss[:, i]) < min_mse + min_mse_std])
+    alpha = np.max(
+        [
+            alphas[i]
+            for i in range(len(alphas))
+            if np.mean(rss[:, i]) < min_mse + min_mse_std
+        ]
+    )
 
     if alpha > np.max(sval) * maxAlphaFrac:
         alpha = np.max(sval) * maxAlphaFrac
@@ -364,13 +382,24 @@ def _diag_dot(D, B):
     """compute dot(diag(D), B)"""
     if len(B.shape) > 1:
         # handle case where B is > 1-d
-        D = D[(slice(None), ) + (np.newaxis, ) * (len(B.shape) - 1)]
+        D = D[(slice(None),) + (np.newaxis,) * (len(B.shape) - 1)]
     return D * B
 
 
-def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
-                     alpha_c=0.0001, support=None, trueLines=None,
-                     alphas=np.logspace(-5, 2, 50), filt_w=101, Y_sig2=None):
+def regulDeblendFunc(
+    X,
+    Y,
+    Y_c=None,
+    ng=200,
+    n_alphas=100,
+    eps=1e-3,
+    alpha_c=0.0001,
+    support=None,
+    trueLines=None,
+    alphas=np.logspace(-5, 2, 50),
+    filt_w=101,
+    Y_sig2=None,
+):
     """
     Estimate coefficients using ridge regression and various methods for
     regularization parameter estimation
@@ -425,8 +454,9 @@ def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
         listSpe = np.dot(X.T, Y_l)
 
         # Then we seek all spectral lines on this bunch of spectra
-        listMask = getLinesSupportList(listSpe, w=2, wmax=20, wmin=2,
-                                       alpha=2.5, n_sig=1.4, filt=None)
+        listMask = getLinesSupportList(
+            listSpe, w=2, wmax=20, wmin=2, alpha=2.5, n_sig=1.4, filt=None
+        )
 
     # preferred approach : group bic approach
     l_coeff, l_intercepts = glasso_bic(X, Y_l, ng=ng, listMask=listMask)
@@ -441,7 +471,8 @@ def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
 
     # preferred method : sliding Ridge GCV
     c_coeff, c_intercepts, c_alphas, listRSS = gridge_cv(
-        X, Y_c, ng=ng, support=support, sig2=Y_sig2, alphas=alphas)
+        X, Y_c, ng=ng, support=support, sig2=Y_sig2, alphas=alphas
+    )
 
     # correct flux
     # add one row of ones for background/intercept to keep corresponding
@@ -455,8 +486,19 @@ def regulDeblendFunc(X, Y, Y_c=None, ng=200, n_alphas=100, eps=1e-3,
     res = c_coeff + l_coeff
     intercepts = c_intercepts + l_intercepts
 
-    return (res, intercepts, listMask, c_coeff, l_coeff, Y, Y_l, Y_c,
-            c_alphas, listRSS, listA)
+    return (
+        res,
+        intercepts,
+        listMask,
+        c_coeff,
+        l_coeff,
+        Y,
+        Y_l,
+        Y_c,
+        c_alphas,
+        listRSS,
+        listA,
+    )
 
 
 def corrFlux(X, Y, beta):
@@ -492,7 +534,7 @@ def corrFlux(X, Y, beta):
             listI[:] = True
         Y_t = np.dot(Y, np.linalg.pinv(beta[listI, :]))
         for j, i in enumerate(np.arange(X.shape[1])[listI]):
-            a = np.dot(Y_t[:, j], X[:, i]) / np.linalg.norm(X[:, i])**2
+            a = np.dot(Y_t[:, j], X[:, i]) / np.linalg.norm(X[:, i]) ** 2
             if a < 1:
                 listI[i] = False
                 listA[i] = 1

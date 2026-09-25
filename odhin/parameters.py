@@ -7,49 +7,49 @@
 import numpy as np
 import yaml
 
-__all__ = ('DEFAULT_PARAMS', 'Params', 'load_settings')
+__all__ = ("DEFAULT_PARAMS", "Params", "load_settings")
 
 DEFAULT_PARAMS = {
     # Beta parameter for HST PSF Moffat model
-    'beta_hst': 1.6,
+    "beta_hst": 1.6,
     # FHWM parameter for HST PSF Moffat
-    'fwhm_hst': 0.085,
+    "fwhm_hst": 0.085,
     # number of spectral blocks wherein MUSE FSF is considered constant
-    'nBands': 10,
+    "nBands": 10,
     # slope and intercept parameters of MUSE FSF fwhm spectral evolution
     # model: fhwm =  a + b * lambda
-    'fsf_a_muse': 0.869,
-    'fsf_b_muse': -3.401e-05,
+    "fsf_a_muse": 0.869,
+    "fsf_b_muse": -3.401e-05,
     # Beta parameter for MUSE FSF Moffat model
-    'fsf_beta_muse': 2.8,
+    "fsf_beta_muse": 2.8,
     # mean wavelength to be used for grouping (where white MUSE image is used)
-    'fsf_wavelength': 7000,
+    "fsf_wavelength": 7000,
     # absolute cut value for convolution during grouping
-    'cut': (0.005, 0.0005),
+    "cut": (0.005, 0.0005),
     # Get mask containing a fraction alpha_cut of total map intensity
-    'alpha_cut': 0.999,
+    "alpha_cut": 0.999,
     # regularize deblending
-    'regul': True,
+    "regul": True,
     # size of median filter for separating continuum from lines in the
     # regularization process
-    'filt_w': 101,
+    "filt_w": 101,
     # minimal width of a group bounding box
-    'min_width': 6,
+    "min_width": 6,
     # additional margin in pixels around a ground bounding box
-    'margin_bbox': 3,
+    "margin_bbox": 3,
     # minimal number of sky pixels in a bounding box to estimate correctly
     # the background
-    'min_sky_pixels': 20,
+    "min_sky_pixels": 20,
 }
 """Default values for the parameters."""
 
 
 def load_settings(settings_file):
     """Load the YAML settings, and substitute keys from the 'vars' block."""
-    with open(settings_file, 'r') as f:
+    with open(settings_file, "r") as f:
         conftext = f.read()
     conf = yaml.safe_load(conftext)
-    conftext = conftext.format(**conf.get('vars', {}))
+    conftext = conftext.format(**conf.get("vars", {}))
     return yaml.safe_load(conftext)
 
 
@@ -61,6 +61,7 @@ class Params(dict):
     the settings file.
 
     """
+
     def __init__(self, **kwargs):
         # initialize dict with DEFAULT_PARAMS, and override with the provided
         # parameters (kwargs)
@@ -78,5 +79,6 @@ class Params(dict):
     def alpha_hst(self):
         """Return the alpha value for the Moffat PSF of HST."""
         # expressed in MUSE pixels
-        return np.sqrt((self.fwhm_hst / 0.2 * 15) ** 2 /
-                       (4 * (2**(1 / self.beta_hst) - 1)))
+        return np.sqrt(
+            (self.fwhm_hst / 0.2 * 15) ** 2 / (4 * (2 ** (1 / self.beta_hst) - 1))
+        )
