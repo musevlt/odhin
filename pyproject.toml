@@ -56,4 +56,4 @@ unfixable = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["zap"]
+known-first-party = ["odhin"]
