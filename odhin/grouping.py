@@ -119,7 +119,7 @@ def doGrouping(imHR, segmap, imMUSE, cat, kernel, params, idname='ID', verbose=T
     logger = logging.getLogger(__name__)
 
     if len(params.cut) != 2:
-        raise ValueError(f'the cut param must contain 2 values')
+        raise ValueError('the cut param must contain 2 values')
 
     groups = []
     im_label_comb = None

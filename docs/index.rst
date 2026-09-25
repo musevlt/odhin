@@ -5,8 +5,6 @@ ODHIN |release| documentation
 :Release: |release|
 :Date: |today|
 
-.. .. include:: ../README.rst
-
 Example
 =======
 

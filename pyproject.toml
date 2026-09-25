@@ -1,5 +1,5 @@
 [build-system]
-requires = [ "setuptools>=77.0.0", "setuptools_scm>=8.0.0" ]
+requires = ["setuptools>=77.0.0", "setuptools_scm>=8.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -45,7 +45,7 @@ write_to = "odhin/version.py"
 
 [tool.ruff.lint]
 select = [
-  # "E", "F", "W", # flake8
+  "E", "F", "W", # flake8
   # "B",           # bugbear
   "I",           # isort
   # "UP",          # pyupgrade
