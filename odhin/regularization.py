@@ -154,7 +154,7 @@ def lasso_bic(X, Y, multivar=True, greedy=False, averaged=True,
     mean_squared_error = np.array(mean_squared_error)
 
     # get the number of degrees of freedom
-    df = np.zeros(len(coef_path_), dtype=np.int)  # Degrees of freedom
+    df = np.zeros(len(coef_path_), dtype=int)  # Degrees of freedom
     for k, coef in enumerate(coef_path_):
         df[k] = coef.size
         if multivar:  # add one for each wavelength variance
@@ -270,7 +270,23 @@ def gridge_cv(X, Y, ng=1, alphas=np.logspace(-5, 2, 50), sig2=None,
         listAlpha[kind] = alpha
         listRSS.append(rss.mean(axis=0).mean(axis=0))
 
-        Ridge = sklm.Ridge(alpha=alpha, fit_intercept=True, normalize=True)
+        # FIXME: normalize=True deprecated and then removed:
+        #
+        # The parameter normalize of :class:`linear_model.LinearRegression` is
+        # deprecated and will be removed in 1.2. Motivation for this
+        # deprecation: normalize parameter did not take any effect if
+        # fit_intercept was set to False and therefore was deemed confusing.
+        # The behavior of the deprecated LinearModel(normalize=True) can be
+        # reproduced with a :class:`~sklearn.pipeline.Pipeline` with
+        # LinearModel (where LinearModel is
+        # :class:`~linear_model.LinearRegression`,
+        # :class:`~linear_model.Ridge`, :class:`~linear_model.RidgeClassifier`,
+        # :class:`~linear_model.RidgeCV` or
+        # :class:`~linear_model.RidgeClassifierCV`) as follows:
+        # make_pipeline(StandardScaler(with_mean=False), LinearModel()).
+
+        # Ridge = sklm.Ridge(alpha=alpha, fit_intercept=True, normalize=True)
+        Ridge = sklm.Ridge(alpha=alpha, fit_intercept=True)
         Ridge.fit(X, Y[:, kind])
         coeff[:, kind] = Ridge.coef_.T
         intercepts[:, kind] = Ridge.intercept_.T

@@ -252,7 +252,7 @@ class ODHIN:
         """
         tables = []
         for f in self.output_dir.glob('group_*.fits'):
-            t = Table.read(f, hdu='TAB_SOURCES')
+            t = Table.read(f, hdu='TAB_SOURCES', unit_parse_strict="silent")
             t['timestamp'] = fits.getval(f, 'ODH_TS')
             tables.append(t)
 
@@ -323,7 +323,7 @@ class ODHIN:
         if 'bg' in src:
             src.remove('bg')
         self.cat.plot_symb(ax, subim.wcs, label=True, esize=0.4)
-        cat = self.cat[np.in1d(self.cat[self.idname], src)]
+        cat = self.cat[np.isin(self.cat[self.idname], src)]
         y, x = subim.wcs.sky2pix(np.array([cat[self.decname], cat[self.raname]]).T).T
         ax.scatter(x, y, c="r")
 

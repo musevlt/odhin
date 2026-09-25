@@ -223,7 +223,12 @@ def getObjsInBlob(idname, cat, sub_blob_mask, subimMUSE, listHST_ID):
         List of all catalog IDs in the cutout.
 
     """
-    subcat = cat.loc[idname, listHST_ID]
+    try:
+        # astropy v7.2.0+
+        subcat = cat.loc.with_index(idname)[listHST_ID]
+    except AttributeError:
+        subcat = cat.loc[idname, listHST_ID]
+
     center = np.array([subcat['DEC'], subcat['RA']]).T
     centerMUSE = subimMUSE.wcs.sky2pix(center, nearest=True).T
     idx = sub_blob_mask[centerMUSE[0], centerMUSE[1]]

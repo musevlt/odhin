@@ -13,10 +13,10 @@ from scipy.signal import fftconvolve
 from skimage.measure import regionprops
 
 try:
-    from photutils.psf_matching import TopHatWindow, create_matching_kernel
+    from photutils.psf_matching import TopHatWindow, make_kernel
 except ImportError:
     # deprecated in photutils 3.0
-    from photutils.psf import TopHatWindow, create_matching_kernel
+    from photutils.psf import TopHatWindow, create_matching_kernel as make_kernel
 
 __all__ = ('generatePSF_HST', 'generateMoffatIm', 'extractHST')
 
@@ -220,7 +220,7 @@ def getBlurKernel(imHR, imLR, sizeKer, returnImBlurred=False, cut=0.00001):
 
     """
     window = TopHatWindow(0.35)
-    kernel = create_matching_kernel(imHR, imLR, window=window)
+    kernel = make_kernel(imHR, imLR, window=window)
     imLRsynth = fftconvolve(imHR, kernel, "same")
     residuals = np.sum((imLR - imLRsynth) ** 2)
     if residuals > 0.1 * np.sum(imLR ** 2):
@@ -310,7 +310,7 @@ def check_segmap_catalog(segmap, cat, idname='ID'):
     """
     keys = np.unique(segmap.data.data)
     keys = keys[keys > 0]
-    missing = keys[~np.in1d(keys, cat[idname])]
+    missing = keys[~np.isin(keys, cat[idname])]
 
     if missing.size > 0:
         logger = logging.getLogger(__name__)
